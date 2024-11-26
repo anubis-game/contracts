@@ -1,0 +1,32 @@
+{
+  "name": "contracts",
+  "version": "v0.1.0",
+  "description": "smart contracts for the anubis game",
+  "scripts": {
+    "compile": "./node_modules/.bin/hardhat compile",
+    "clean": "./node_modules/.bin/hardhat clean",
+    "test": "./node_modules/.bin/hardhat test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anubis-game/contracts.git"
+  },
+  "author": "@xh3b4sd",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/anubis-game/contracts/issues"
+  },
+  "homepage": "https://github.com/anubis-game/contracts#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.11",
+    "hardhat": "^2.22.11",
+    "hardhat-storage-layout": "^0.1.7",
+    "moment": "^2.30.1",
+    "viem": "^2.21.12"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}
