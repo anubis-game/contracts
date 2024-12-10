@@ -8,11 +8,11 @@ describe("Registry", function () {
     it("should emit event", async function () {
       const { Address, Registry, Signer } = await loadFixture(Deploy);
 
-      const txn = Registry.connect(Signer(2)).report(Address(0), Kill(1001), Address(4), Address(5));
+      const txn = Registry.connect(Signer(2)).report(Address(1), Kill(1001), Address(4), Address(5));
 
       await expect(txn)
         .to.emit(Registry, "Report")
-        .withArgs(Address(2), Address(0), Kill(1001), Address(4), Address(5));
+        .withArgs(Address(2), Address(1), Kill(1001), Address(4), Address(5));
     });
   });
 });
