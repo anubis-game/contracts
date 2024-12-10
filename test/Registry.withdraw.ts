@@ -1,93 +1,59 @@
 import { Amount } from "./src/Amount";
-import { Deploy } from "./src/Deploy";
 import { expect } from "chai";
-import { Game } from "./src/Game";
-import { Kill } from "./src/Kill";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { Resolve } from "./src/Deploy";
 
 describe("Registry", function () {
   describe("withdraw", function () {
-    it("should allow signer 4 to withdraw their funds only", async function () {
-      const { Address, Balance, Registry, Signer, Stablecoin } = await loadFixture(Deploy);
+    it("should allow signer 2 to withdraw their funds", async function () {
+      const { Address, Registry, Signer, Stablecoin } = await loadFixture(Resolve);
 
       const reg = await Registry.getAddress();
 
+      // The Registry owns 30 tokens because Wallet 2, 5 and 8 have deposited 10
+      // tokens each.
       {
-        await Balance([2, 3, 4, 5], 10);
-        await Registry.connect(Signer(2)).enterGame(Game(1234));
-        await Registry.connect(Signer(3)).enterGame(Game(1234));
-        await Registry.connect(Signer(4)).enterGame(Game(1234));
-        await Registry.connect(Signer(5)).enterGame(Game(1234));
+        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(30));
+        expect(await Stablecoin.balanceOf(Address(2))).to.equal(0);
       }
 
       {
-        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(4));
-        expect(await Stablecoin.balanceOf(Address(2))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(3))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(4))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(5))).to.equal(Amount(9));
-      }
-
-      await Registry.connect(Signer(7)).guardianResolve(
-        Game(1234),
-        Kill(1001),
-        Address(4), // win
-        Address(5), // los
-      );
-
-      // Signer 4 won against signer 5.
-      {
-        const res = await Registry.searchBalance(Address(4));
-        expect(res[0]).to.equal(Amount(1.4)); // allocated
-        expect(res[1]).to.equal(Amount(0.4)); // available
-        expect(res[2]).to.equal(Amount(0.4)); // historic
+        const res = await Registry.searchBalance(Address(2));
+        expect(res[0]).to.equal(Amount(1)); // allocated
+        expect(res[1]).to.equal(Amount(9)); // available
+        expect(res[2]).to.equal(0); // historic
       }
 
       {
-        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(4));
-        expect(await Stablecoin.balanceOf(Address(2))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(3))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(4))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(5))).to.equal(Amount(9));
-      }
-
-
-      {
-        await Registry.connect(Signer(4)).withdraw(Amount(0.1));
+        await Registry.connect(Signer(2)).withdraw(Amount(3));
       }
 
       {
-        const res = await Registry.searchBalance(Address(4));
-        expect(res[0]).to.equal(Amount(1.4)); // allocated
-        expect(res[1]).to.equal(Amount(0.3)); // available                    // -0.1
-        expect(res[2]).to.equal(Amount(0.4)); // historic
+        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(27)); //            -3
+        expect(await Stablecoin.balanceOf(Address(2))).to.equal(Amount(3)); //      +3
       }
 
       {
-        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(3.9));        // -0.1
-        expect(await Stablecoin.balanceOf(Address(2))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(3))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(4))).to.equal(Amount(9.1)); // +0.1
-        expect(await Stablecoin.balanceOf(Address(5))).to.equal(Amount(9));
+        const res = await Registry.searchBalance(Address(2));
+        expect(res[0]).to.equal(Amount(1)); // allocated
+        expect(res[1]).to.equal(Amount(6)); // available                            -3
+        expect(res[2]).to.equal(0); // historic
       }
 
       {
-        await Registry.connect(Signer(4)).withdraw(Amount(0.3));
+        await Registry.connect(Signer(2)).withdraw(Amount(6));
       }
 
       {
-        const res = await Registry.searchBalance(Address(4));
-        expect(res[0]).to.equal(Amount(1.4)); // allocated
-        expect(res[1]).to.equal(0);           // available                    // -0.3
-        expect(res[2]).to.equal(Amount(0.4)); // historic
+        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(21)); //            -6
+        expect(await Stablecoin.balanceOf(Address(2))).to.equal(Amount(9)); //      +6
       }
 
       {
-        expect(await Stablecoin.balanceOf(reg)).to.equal(Amount(3.6));        // -0.3
-        expect(await Stablecoin.balanceOf(Address(2))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(3))).to.equal(Amount(9));
-        expect(await Stablecoin.balanceOf(Address(4))).to.equal(Amount(9.4)); // +0.3
-        expect(await Stablecoin.balanceOf(Address(5))).to.equal(Amount(9));
+        const res = await Registry.searchBalance(Address(2));
+        expect(res[0]).to.equal(Amount(1)); // allocated
+        expect(res[1]).to.equal(0); // available                                    -6
+        expect(res[2]).to.equal(0); // historic
       }
     });
   });
