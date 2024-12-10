@@ -8,7 +8,7 @@ import {IToken} from "./interface/IToken.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 // Uncomment this line to use console.log
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 contract Registry is AccessControlEnumerable {
     //
