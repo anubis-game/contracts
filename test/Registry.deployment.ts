@@ -1,6 +1,6 @@
+import { Amount } from "./src/Amount";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Amount } from "./src/Amount";
 
 describe("Registry", function () {
   describe("deployment", function () {
