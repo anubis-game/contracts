@@ -11,7 +11,11 @@ export const Deploy = async () => {
   const sig = await ethers.getSigners();
 
   const Stablecoin = await ethers.deployContract("Stablecoin", [18]);
-  const Registry = await ethers.deployContract("Registry", [sig[0].address, await Stablecoin.getAddress()]);
+  const Registry = await ethers.deployContract("Registry", [
+    sig[0].address, //                Owner Address
+    await Stablecoin.getAddress(), // Token Address
+    Amount(1), //                     Buyin Amount (1 token with 18 decimals)
+  ]);
 
   const add = await Registry.getAddress();
 
