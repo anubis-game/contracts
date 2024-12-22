@@ -139,7 +139,7 @@ contract Registry is AccessControlEnumerable {
     // the provided token address, which is immutable, meaning any Registry
     // instance will only ever use a single token. Multiple Registry instances
     // may be deployed to support multiple tokens across the platform.
-    constructor(address own, address tok) {
+    constructor(address own, address tok, uint256 buy) {
         if (own == address(0)) {
             revert Address("Owner address invalid. The given owner must not be zero address.");
         }
@@ -161,9 +161,8 @@ contract Registry is AccessControlEnumerable {
         // cannot be deployed for tokens that do not provide at least 6 decimals
         // for their internal accounting. For instance, USDC has exactly 6
         // decimals defined, and is therefore a valid token to be used.
-        uint8 dec;
         {
-            dec = IToken(tok).decimals();
+            uint8 dec = IToken(tok).decimals();
             if (dec < 6) {
                 revert Balance("Token decimals invalid. The given token must have at least 6 decimals.", dec);
             }
@@ -174,7 +173,7 @@ contract Registry is AccessControlEnumerable {
         }
 
         {
-            buyin = 10 ** dec;
+            buyin = buy;
             owner = own;
             token = tok;
         }
@@ -400,9 +399,6 @@ contract Registry is AccessControlEnumerable {
         bytes32 witKey = keyHash(pla, kil);
         // Create the kill value. This value tells us who won and who lost.
         bytes32 kilVal = valHash(win, los);
-
-        // TODO ensure that only players can report kill state that participated
-        // in the game recently
 
         // Track the kill state based on the data that the witness reported, and
         // ensure that every witness can only report once.

@@ -1,3 +1,4 @@
+import { Amount } from "./src/Amount";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { zeroAddress } from "viem";
@@ -6,10 +7,14 @@ describe("Registry", function () {
   describe("deployment", function () {
     describe("revert", function () {
       it("if owner address is empty", async function () {
-        const Stablecoin = await ethers.deployContract("Stablecoin", [6]);
+        const Stablecoin6 = await ethers.deployContract("Stablecoin", [6]);
         const Registry = await ethers.getContractFactory("Registry");
 
-        const txn = ethers.deployContract("Registry", [zeroAddress, await Stablecoin.getAddress()]);
+        const txn = ethers.deployContract("Registry", [
+          zeroAddress, //                    Owner Address
+          await Stablecoin6.getAddress(), // Token Address
+          Amount(1), //                      Buyin Amount
+        ]);
 
         await expect(txn).to.be.revertedWithCustomError(Registry, "Address");
       });
@@ -18,7 +23,11 @@ describe("Registry", function () {
         const sig = await ethers.getSigners();
         const Registry = await ethers.getContractFactory("Registry");
 
-        const txn = ethers.deployContract("Registry", [sig[0].address, zeroAddress]);
+        const txn = ethers.deployContract("Registry", [
+          sig[0].address, // Owner Address
+          zeroAddress, //    Token Address
+          Amount(1), //      Buyin Amount
+        ]);
 
         await expect(txn).to.be.revertedWithCustomError(Registry, "Address");
       });
@@ -29,7 +38,11 @@ describe("Registry", function () {
         const Registry = await ethers.getContractFactory("Registry");
         const Stablecoin5 = await ethers.deployContract("Stablecoin", [5]);
 
-        const txn = ethers.deployContract("Registry", [sig[0].address, await Stablecoin5.getAddress()]);
+        const txn = ethers.deployContract("Registry", [
+          sig[0].address, //                 Owner Address
+          await Stablecoin5.getAddress(), // Token Address
+          Amount(1), //                      Buyin Amount
+        ]);
 
         await expect(txn).to.be.revertedWithCustomError(Registry, "Balance");
       });
@@ -38,9 +51,13 @@ describe("Registry", function () {
         const sig = await ethers.getSigners();
 
         const Registry = await ethers.getContractFactory("Registry");
-        const Stablecoin5 = await ethers.deployContract("Stablecoin", [2]);
+        const Stablecoin2 = await ethers.deployContract("Stablecoin", [2]);
 
-        const txn = ethers.deployContract("Registry", [sig[0].address, await Stablecoin5.getAddress()]);
+        const txn = ethers.deployContract("Registry", [
+          sig[0].address, //                 Owner Address
+          await Stablecoin2.getAddress(), // Token Address
+          Amount(1), //                      Buyin Amount
+        ]);
 
         await expect(txn).to.be.revertedWithCustomError(Registry, "Balance");
       });
@@ -48,7 +65,11 @@ describe("Registry", function () {
       it("if token contract is not ERC20", async function () {
         const sig = await ethers.getSigners();
 
-        const txn = ethers.deployContract("Registry", [sig[0].address, sig[1].address]);
+        const txn = ethers.deployContract("Registry", [
+          sig[0].address, // Owner Address
+          sig[1].address, // Token Address
+          Amount(1), //      Buyin Amount
+        ]);
 
         await expect(txn).to.be.revertedWithoutReason();
       });
