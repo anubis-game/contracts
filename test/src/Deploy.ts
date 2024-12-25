@@ -1,11 +1,12 @@
 import { Address } from "viem";
 import { Amount } from "./Amount";
+import { DepositSignature } from "./Signature";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Kill } from "./Kill";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { Signature } from "./Signature";
+import { RequestSignature } from "./Signature";
 
 export const Deploy = async () => {
   const sig = await ethers.getSigners();
@@ -53,13 +54,6 @@ export const RequestForWallet = (ind: number[]) => {
       const pla = Signer(x + 2);
       const tim = (await ethers.provider.getBlock("latest"))?.timestamp || 0;
 
-      const sgn = await Signature({
-        guardian: grd.address as Address,
-        signer: sig,
-        player: pla.address as Address,
-        timestamp: tim,
-      });
-
       {
         expect(await Stablecoin.balanceOf(pro.address)).to.equal(0);
         expect(await Stablecoin.balanceOf(grd.address)).to.equal(0);
@@ -87,8 +81,14 @@ export const RequestForWallet = (ind: number[]) => {
         expect(res[2]).to.equal(0); // historic
       }
 
+      const sg1 = await DepositSignature({
+        signer: sig,
+        timestamp: tim,
+        wallet: wal.address as Address,
+      });
+
       {
-        await Registry.connect(wal).deposit(Amount(10), sig.address);
+        await Registry.connect(wal).deposit(Amount(10), tim, sig.address, sg1);
       }
 
       // After the deposit, the registry contract should own the deposited
@@ -111,8 +111,15 @@ export const RequestForWallet = (ind: number[]) => {
         expect(res[2]).to.equal(0); // historic
       }
 
+      const sg2 = await RequestSignature({
+        signer: sig,
+        timestamp: tim,
+        guardian: grd.address as Address,
+        player: pla.address as Address,
+      });
+
       {
-        await Registry.connect(pla).request(grd, tim, wal, sgn);
+        await Registry.connect(pla).request(grd, tim, wal, sg2);
       }
 
       // After the request, the Wallet address should have allocated some buy-in
