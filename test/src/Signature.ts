@@ -2,14 +2,25 @@ import { Address } from "viem";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Hex } from "viem";
 
-interface Arguments {
-  guardian: Address;
+interface DepositArguments {
   signer: HardhatEthersSigner;
-  player: Address;
   timestamp: number;
+  wallet: Address;
 }
 
-export const Signature = async (arg: Arguments): Promise<Hex> => {
-  const msg = ["request", arg.guardian.toLowerCase(), arg.timestamp.toString(), arg.player.toLowerCase()].join("-");
+export const DepositSignature = async (arg: DepositArguments): Promise<Hex> => {
+  const msg = ["deposit", arg.timestamp.toString(), arg.wallet.toLowerCase()].join("-");
+  return (await arg.signer.signMessage(msg)) as Hex;
+};
+
+interface RequestArguments {
+  signer: HardhatEthersSigner;
+  timestamp: number;
+  guardian: Address;
+  player: Address;
+}
+
+export const RequestSignature = async (arg: RequestArguments): Promise<Hex> => {
+  const msg = ["request", arg.timestamp.toString(), arg.guardian.toLowerCase(), arg.player.toLowerCase()].join("-");
   return (await arg.signer.signMessage(msg)) as Hex;
 };

@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { RequestForWallet } from "./src/Deploy";
-import { Signature } from "./src/Signature";
+import { RequestSignature } from "./src/Signature";
 
 describe("Registry", function () {
   describe("request", function () {
@@ -18,16 +18,16 @@ describe("Registry", function () {
         const pla = Signer(4);
         const tim = (await ethers.provider.getBlock("latest"))?.timestamp || 0;
 
-        const sgn = await Signature({
-          guardian: grd.address as Address,
+        const sgn = await RequestSignature({
           signer: sig,
-          player: pla.address as Address,
           timestamp: tim,
+          guardian: grd.address as Address,
+          player: pla.address as Address,
         });
 
         {
           const txn = Registry.connect(pla).request(grd, tim, wal, sgn);
-          await expect(txn).to.be.revertedWithCustomError(Registry, "Process");
+          await expect(txn).to.be.revertedWithCustomError(Registry, "Address");
         }
       });
     });
