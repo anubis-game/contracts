@@ -37,7 +37,7 @@ describe("Registry", function () {
         }
 
         {
-          const res = await Registry.searchSigner(wal.address);
+          const res = await Registry.searchSigner(fak.address);
           expect(res[0]).to.equal(zeroAddress);
           expect(res[1]).to.equal(zeroAddress);
         }
