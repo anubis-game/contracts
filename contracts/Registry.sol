@@ -212,17 +212,18 @@ contract Registry is AccessControlEnumerable {
     // clients that have not been reconciled within this maximum time period
 
     // The user's Wallet may sign a transaction once in order to deposit tokens
-    // into the Registry by proving ownership over a delegated Signer. This
-    // dedicated contract write for depositing an available balance allows the
-    // user to control their funds at all times, while further game related
-    // functionality is delegated to the Signer. The Signer will later prove
-    // that the Wallet, Signer and Player addresses are all controlled by the
-    // same entity. The tokens deposited here become the user's available
-    // balance within the trustless Registry smart contract. The Signer is
-    // authorized to request participation in a new game via the Player, which
-    // will then allocate the user's available balance, but only on behalf of
-    // the user's Wallet. Neither the Signer nor the Player will ever be able to
-    // withdraw user funds from the Registry.
+    // into the Registry by proving ownership over a delegated Signer. An
+    // EIP-191 compliant signature must be provided, which has to recover to the
+    // provided Signer address. This dedicated contract write for depositing an
+    // available balance allows the user to control their funds at all times,
+    // while further game related functionality is delegated to the Signer. The
+    // Signer will later prove that the Wallet, Signer and Player addresses are
+    // all controlled by the same entity. The tokens deposited here become the
+    // user's available balance within the trustless Registry smart contract.
+    // The Signer is authorized to request participation in a new game via the
+    // Player, which will then allocate the user's available balance, but only
+    // on behalf of the user's Wallet. Neither the Signer nor the Player will
+    // ever be able to withdraw user funds from the Registry.
     function deposit(
         uint256 bal,
         uint64 tim,

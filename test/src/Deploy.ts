@@ -1,11 +1,12 @@
 import { Address } from "viem";
 import { Amount } from "./Amount";
+import { DepositSignature } from "./Signature";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { Kill } from "./Kill";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { DepositSignature, RequestSignature } from "./Signature";
+import { RequestSignature } from "./Signature";
 
 export const Deploy = async () => {
   const sig = await ethers.getSigners();
