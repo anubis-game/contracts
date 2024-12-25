@@ -1,10 +1,11 @@
+import { Address } from "viem";
 import { Amount } from "./src/Amount";
 import { Deploy } from "./src/Deploy";
+import { DepositSignature } from "./src/Signature";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { DepositSignature } from "./src/Signature";
-import { Address } from "viem";
+import { zeroAddress } from "viem";
 
 describe("Registry", function () {
   describe("deposit", function () {
@@ -43,6 +44,12 @@ describe("Registry", function () {
         expect(res[0]).to.equal(0); // allocated
         expect(res[1]).to.equal(0); // available
         expect(res[2]).to.equal(0); // historic
+      }
+
+      {
+        const res = await Registry.searchSigner(wal.address);
+        expect(res[0]).to.equal(zeroAddress);
+        expect(res[1]).to.equal(zeroAddress);
       }
 
       const sg1 = await DepositSignature({
