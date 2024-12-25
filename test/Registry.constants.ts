@@ -13,7 +13,7 @@ describe("Registry", function () {
     it("should expose VERSION constant", async function () {
       const { Registry } = await loadFixture(Deploy);
 
-      expect(await Registry.VERSION()).to.equal("v0.1.0");
+      expect(await Registry.VERSION()).to.equal("v0.2.0");
     });
   });
 });
