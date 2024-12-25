@@ -1,10 +1,10 @@
 import { Address } from "viem";
 import { Amount } from "./src/Amount";
 import { Deploy } from "./src/Deploy";
+import { DepositSignature } from "./src/Signature";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { DepositSignature } from "./src/Signature";
 import { zeroAddress } from "viem";
 
 describe("Registry", function () {
