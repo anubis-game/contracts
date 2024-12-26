@@ -292,17 +292,17 @@ contract Registry is AccessControlEnumerable {
         // available balances for the provided game.
         bytes32 key = balHash(wal, grd);
 
-        // Ensure that the given timestamp cannot be in the future. This
+        // Ensure that the given timestamp cannot be too far in the future. This
         // restricts the potential entropy for signature forgery.
-        if (tim > block.timestamp) {
+        if (tim >= block.timestamp + 60) {
             revert Process(
-                "Unix timestamp invalid. The timestamp must not be in the future"
+                "Unix timestamp invalid. The timestamp must not be more than 60 seconds in the future"
             );
         }
 
         // Ensure that the given timestamp cannot be in the past. This
         // restricts the potential entropy for signature forgery.
-        if (tim < block.timestamp - 60 seconds) {
+        if (tim <= block.timestamp - 60 seconds) {
             revert Process(
                 "Unix timestamp invalid. The timestamp must not be older than 60 seconds."
             );
@@ -763,17 +763,17 @@ contract Registry is AccessControlEnumerable {
             );
         }
 
-        // Ensure that the given timestamp cannot be in the future. This
+        // Ensure that the given timestamp cannot be too far in the future. This
         // restricts the potential entropy for signature forgery.
-        if (tim > block.timestamp) {
+        if (tim >= block.timestamp + 60) {
             revert Process(
-                "Unix timestamp invalid. The timestamp must not be in the future"
+                "Unix timestamp invalid. The timestamp must not be more than 60 seconds in the future"
             );
         }
 
         // Ensure that the given timestamp cannot be in the past. This
         // restricts the potential entropy for signature forgery.
-        if (tim < block.timestamp - 60 seconds) {
+        if (tim <= block.timestamp - 60 seconds) {
             revert Process(
                 "Unix timestamp invalid. The timestamp must not be older than 60 seconds."
             );

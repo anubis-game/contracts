@@ -6,12 +6,12 @@ import { storageLayout } from "hardhat";
 const main = async () => {
   try {
     await storageLayout.export();
-  } catch (error) {
-    console.error("Error:", error);
+  } catch (err) {
+    console.error("Error:", err);
   }
 };
 
-main().catch((error) => {
-  console.error(error);
+main().catch((err) => {
+  console.error(err);
   process.exitCode = 1;
 });
