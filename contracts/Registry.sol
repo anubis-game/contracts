@@ -129,7 +129,7 @@ contract Registry is AccessControlEnumerable {
     // used to calculate fees and their remainders.
     uint16 public constant BASIS_TOTAL = 10_000;
     // VERSION is the code release of https://github.com/anubis-game/contracts.
-    string public constant VERSION = "v0.2.0";
+    string public constant VERSION = "v0.3.0";
 
     //
     // VARIABLES
