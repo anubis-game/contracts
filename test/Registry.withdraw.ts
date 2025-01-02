@@ -20,7 +20,7 @@ describe("Registry", function () {
       {
         const res = await Registry.searchBalance(Address(2));
         expect(res[0]).to.equal(Amount(1)); // allocated
-        expect(res[1]).to.equal(Amount(9)); // available
+        expect(res[1]).to.equal(Amount(9)); // deposited
         expect(res[2]).to.equal(0); // historic
       }
 
@@ -36,7 +36,7 @@ describe("Registry", function () {
       {
         const res = await Registry.searchBalance(Address(2));
         expect(res[0]).to.equal(Amount(1)); // allocated
-        expect(res[1]).to.equal(Amount(6)); // available                            -3
+        expect(res[1]).to.equal(Amount(6)); // deposited                            -3
         expect(res[2]).to.equal(0); // historic
       }
 
@@ -52,7 +52,7 @@ describe("Registry", function () {
       {
         const res = await Registry.searchBalance(Address(2));
         expect(res[0]).to.equal(Amount(1)); // allocated
-        expect(res[1]).to.equal(0); // available                                    -6
+        expect(res[1]).to.equal(0); // deposited                                    -6
         expect(res[2]).to.equal(0); // historic
       }
     });

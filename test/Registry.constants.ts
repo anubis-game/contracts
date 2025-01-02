@@ -1,3 +1,4 @@
+import { Amount } from "./src/Amount";
 import { Deploy } from "./src/Deploy";
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
@@ -8,6 +9,12 @@ describe("Registry", function () {
       const { Registry } = await loadFixture(Deploy);
 
       expect(await Registry.BASIS_TOTAL()).to.equal(10_000);
+    });
+
+    it("should expose immutable BUYIN variable", async function () {
+      const { Registry } = await loadFixture(Deploy);
+
+      expect(await Registry.buyin()).to.equal(Amount(1));
     });
 
     it("should expose VERSION constant", async function () {
