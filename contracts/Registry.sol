@@ -71,11 +71,11 @@ contract Registry is AccessControlEnumerable {
     // MAPPINGS
     //
 
-    // _allocBalance contains the allocated balance every player has in this
+    // _allocatedBalance contains the allocated balance every player has in this
     // smart contract. Allocated balances may increase by entering games. The
     // allocated balance is the part of the player balance that cannot be
     // withdrawn until the allocated game state is resolved.
-    mapping(bytes32 => uint256) private _allocBalance;
+    mapping(bytes32 => uint256) private _allocatedBalance;
     // _depositedBalance contains the deposited balance every player has in this
     // smart contract. Deposited balances may increase if players kill other
     // players. The deposited balance is the part of the player balance that can
@@ -208,8 +208,9 @@ contract Registry is AccessControlEnumerable {
     //
 
     // TODO provide escape hatch for users to withdraw their buyin if they did
-    // not die after e.g. 1 hour, this also means the Guardian has to stop serving
-    // clients that have not been reconciled within this maximum time period
+    // not die after e.g. 1 hour, this also means the Guardian has to stop
+    // serving clients that have not been reconciled within this maximum time
+    // period
 
     // The user's Wallet may sign a transaction once in order to deposit tokens
     // into the Registry by proving ownership over a delegated Signer. An
@@ -352,7 +353,7 @@ contract Registry is AccessControlEnumerable {
         // their Player is rewarded upon killing another Player within the scope
         // of a played game.
         {
-            _allocBalance[key] = buyin;
+            _allocatedBalance[key] = buyin;
         }
     }
 
@@ -436,7 +437,7 @@ contract Registry is AccessControlEnumerable {
         // Ensure that the winning Player has in fact an allocated balance. An
         // Address without an allocated balance does not participate in the game
         // and can therefore not be resolved.
-        if (_allocBalance[winKey] == 0) {
+        if (_allocatedBalance[winKey] == 0) {
             revert Process(
                 "Guardian resolve invalid. Winning address has no allocated balance."
             );
@@ -445,7 +446,7 @@ contract Registry is AccessControlEnumerable {
         // Ensure that the losing Player has in fact an allocated balance. An
         // Address without an allocated balance does not participate in the game
         // and can therefore not be resolved.
-        if (_allocBalance[losKey] == 0) {
+        if (_allocatedBalance[losKey] == 0) {
             revert Process(
                 "Guardian resolve invalid. Losing address has no allocated balance."
             );
@@ -490,7 +491,7 @@ contract Registry is AccessControlEnumerable {
         address wal
     ) public view returns (uint256, uint256, uint256) {
         return (
-            _allocBalance[balHash(wal, _walletGuardian[wal])],
+            _allocatedBalance[balHash(wal, _walletGuardian[wal])],
             _depositedBalance[wal],
             _historicGain[wal]
         );
@@ -601,13 +602,13 @@ contract Registry is AccessControlEnumerable {
         uint256 ownBal;
         uint256 depBal;
         {
-            grdBal = (_allocBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            ownBal = (_allocBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            depBal = _allocBalance[losKey] - (grdBal + ownBal);
+            grdBal = (_allocatedBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
+            ownBal = (_allocatedBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
+            depBal = _allocatedBalance[losKey] - (grdBal + ownBal);
         }
 
         {
-            _allocBalance[losKey] = 0;
+            _allocatedBalance[losKey] = 0;
             _depositedBalance[los] += depBal;
             _walletGuardian[los] = address(0);
             _depositedBalance[grd] += grdBal;
@@ -644,9 +645,9 @@ contract Registry is AccessControlEnumerable {
         uint256 depBal;
 
         unchecked {
-            feeBal = (_allocBalance[losKey] * BASIS_FEE) / BASIS_TOTAL;
-            grdBal = (_allocBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            ownBal = _allocBalance[losKey] - (feeBal + grdBal);
+            feeBal = (_allocatedBalance[losKey] * BASIS_FEE) / BASIS_TOTAL;
+            grdBal = (_allocatedBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
+            ownBal = _allocatedBalance[losKey] - (feeBal + grdBal);
             aloBal = (feeBal * BASIS_SPLIT) / BASIS_TOTAL;
             depBal = (feeBal - aloBal);
         }
@@ -657,7 +658,7 @@ contract Registry is AccessControlEnumerable {
             // bigger. If this winning player is going to be defeated by another
             // player eventually, then this new winning player wins a bigger
             // allocation.
-            _allocBalance[winKey] += aloBal;
+            _allocatedBalance[winKey] += aloBal;
             // Move half of the allocated loser balance to the deposited winner
             // balance. This secures some of the winnings so that winners may
             // recoup their entry allocation and eventually get away with
@@ -678,7 +679,7 @@ contract Registry is AccessControlEnumerable {
             // Take all allocated balance away from the losing player. That
             // enables the losing player to enter the same game again, if they
             // wish to.
-            _allocBalance[losKey] = 0;
+            _allocatedBalance[losKey] = 0;
             // Remove the game ID from the mapping of the losing player. That
             // enables the losing player to enter any game again, if they wish
             // to.
