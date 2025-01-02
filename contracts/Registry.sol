@@ -55,7 +55,7 @@ contract Registry is AccessControlEnumerable {
     //     kil is the ID of the kill state itself being resolved
     //     win is the address of the winning player being resolved
     //     los is the address of the losing player being resolved
-    //     avl is the amount of tokens won by the winning player
+    //     dep is the amount of tokens won by the winning player
     //     bin is the amount of tokens lost by the losing player
     //
     event Resolve(
@@ -63,7 +63,7 @@ contract Registry is AccessControlEnumerable {
         uint256 kil,
         address win,
         address los,
-        uint256 avl,
+        uint256 dep,
         uint256 bin
     );
 
@@ -76,11 +76,11 @@ contract Registry is AccessControlEnumerable {
     // allocated balance is the part of the player balance that cannot be
     // withdrawn until the allocated game state is resolved.
     mapping(bytes32 => uint256) private _allocBalance;
-    // _availBalance contains the available balance every player has in this
-    // smart contract. Available balances may increase if players kill other
-    // players. The available balance is the part of the player balance that can
+    // _depositedBalance contains the deposited balance every player has in this
+    // smart contract. Deposited balances may increase if players kill other
+    // players. The deposited balance is the part of the player balance that can
     // be withdrawn any time.
-    mapping(address => uint256) private _availBalance;
+    mapping(address => uint256) private _depositedBalance;
     // _historicGain tracks the historical net balances gained by winning games.
     // This counter increases if players win and decreases if players lose. The
     // "best" player will have the highest historic gain, because that player
@@ -120,10 +120,10 @@ contract Registry is AccessControlEnumerable {
     // is also how we account for precision loss.
     uint16 public constant BASIS_PROTOCOL = 1_000;
     // BASIS_SPLIT is the amount in basis points that splits loser allocations,
-    // so that we can distribute towards the winners allocated and available
+    // so that we can distribute towards the winners allocated and deposited
     // balances. 5000 means 50%. So if you kill me, then half of my allocation
     // goes towards your allocation, and the other half goes towards your
-    // available balance.
+    // deposited balance.
     uint16 public constant BASIS_SPLIT = 5_000;
     // BASIS_TOTAL is the total amount of basis points in 100%. This amount is
     // used to calculate fees and their remainders.
@@ -215,13 +215,13 @@ contract Registry is AccessControlEnumerable {
     // into the Registry by proving ownership over a delegated Signer. An
     // EIP-191 compliant signature must be provided, which has to recover to the
     // provided Signer address. This dedicated contract write for depositing an
-    // available balance allows the user to control their funds at all times,
+    // deposited balance allows the user to control their funds at all times,
     // while further game related functionality is delegated to the Signer. The
     // Signer will later prove that the Wallet, Signer and Player addresses are
     // all controlled by the same entity. The tokens deposited here become the
-    // user's available balance within the trustless Registry smart contract.
+    // user's deposited balance within the trustless Registry smart contract.
     // The Signer is authorized to request participation in a new game via the
-    // Player, which will then allocate the user's available balance, but only
+    // Player, which will then allocate the user's deposited balance, but only
     // on behalf of the user's Wallet. Neither the Signer nor the Player will
     // ever be able to withdraw user funds from the Registry.
     function deposit(
@@ -231,7 +231,7 @@ contract Registry is AccessControlEnumerable {
         bytes memory sgn
     ) public {
         // wal is the user's Wallet address which is attempting to deposit the
-        // provided amount as available balance.
+        // provided amount as deposited balance.
         address wal = msg.sender;
 
         // Deposit the user's tokens from the user wallet into this smart
@@ -243,18 +243,18 @@ contract Registry is AccessControlEnumerable {
         }
 
         // Map the given Wallet-Signer relationship, if we find it to be valid.
-        // Only if this succeeds we can credit the transferred available balance
+        // Only if this succeeds we can credit the transferred deposited balance
         // to the internal account of the calling Wallet.
         {
             verifySigner(tim, sig, sgn);
             updateSigner(sig);
         }
 
-        // Credit the Wallet address with the deposited amount. The available
+        // Credit the Wallet address with the deposited amount. The deposited
         // balance can only ever be withdrawn by the Wallet itself, never by the
         // Signer nor the Player address.
         {
-            _availBalance[wal] += bal;
+            _depositedBalance[wal] += bal;
         }
     }
 
@@ -263,7 +263,7 @@ contract Registry is AccessControlEnumerable {
     // seconds, the associated Wallet address, and an EIP-191 compliant
     // signature generated by the Signer. This contract write will allocated the
     // game specific buy-in amount, which means that the Player is spending the
-    // available balance of the Wallet, but only to the extend of the buy-in
+    // deposited balance of the Wallet, but only to the extend of the buy-in
     // amount required for game participation. The success of this contract
     // write proves onchain that the Wallet controls the Signer, and that the
     // Signer controls the Player, which in turn proves that the Wallet controls
@@ -284,12 +284,12 @@ contract Registry is AccessControlEnumerable {
         // rec is the user's Signer address that generated the provided
         // signature. This address points to the user's Wallet.
         address rec = recoverSigner(requestMessage(grd, tim, pla), sgn);
-        // avl is the user's available balance that the Player is authorized
+        // dep is the user's deposited balance that the Player is authorized
         // through the delegated Signer to use in order to request participation
         // in a new game.
-        uint256 avl = _availBalance[wal];
+        uint256 dep = _depositedBalance[wal];
         // Create the balance key. This key points to the player's allocated and
-        // available balances for the provided game.
+        // deposited balances for the provided game.
         bytes32 key = balHash(wal, grd);
 
         // Ensure that the given timestamp cannot be too far in the future. This
@@ -330,25 +330,25 @@ contract Registry is AccessControlEnumerable {
         }
 
         // Account for the balance required in order to enter a new game. We try
-        // to prevent token transfers if the available user balance is
-        // sufficient. Any tokens missing will be requested from the configured
-        // token contract. The caller then needs to provide an allowance that is
-        // able to cover the difference transferred.
-        if (avl >= buyin) {
-            _availBalance[wal] -= buyin;
+        // to prevent token transfers if the deposited balance is sufficient.
+        // Any tokens missing will be requested from the configured token
+        // contract. The caller then needs to provide an allowance that is able
+        // to cover the difference transferred.
+        if (dep >= buyin) {
+            _depositedBalance[wal] -= buyin;
         } else {
             revert Balance(
-                "Available balance insufficient. Minimum buyin required.",
+                "Deposited balance insufficient. Minimum buyin required.",
                 buyin
             );
         }
 
         // Track the user's allocated balance so we can tell people where they
         // stand any time. The allocated balances are all funds that are
-        // currently bound in active games. The user's available balance does
+        // currently bound in active games. The user's deposited balance does
         // not change here because the user is directly allocating their
-        // available balance to the provided game when requesting to play. The
-        // user's available balances may only increase later, if, and only if
+        // deposited balance to the provided game when requesting to play. The
+        // user's deposited balances may only increase later, if, and only if
         // their Player is rewarded upon killing another Player within the scope
         // of a played game.
         {
@@ -356,18 +356,18 @@ contract Registry is AccessControlEnumerable {
         }
     }
 
-    // withdraw allows anyone to withdraw their own available balance any time
+    // withdraw allows anyone to withdraw their own deposited balance any time
     // as distributed by this smart contract.
     function withdraw(uint256 bal) public {
         // use is the caller's address which is attempting to withdraw the
-        // provided amount of available tokens.
+        // provided amount of deposited tokens.
         address use = msg.sender;
 
         // The arithmetic below is intentionally defined outside of an
         // "unchecked" block, so that anyone trying to withdraw more than they
         // are owed causes their own transaction to revert with a panic.
         {
-            _availBalance[use] -= bal;
+            _depositedBalance[use] -= bal;
         }
 
         if (!IERC20(token).transfer(use, bal)) {
@@ -411,7 +411,7 @@ contract Registry is AccessControlEnumerable {
         // grd
         address grd = msg.sender;
         // Create the winner key. This key points to the winner's allocated and
-        // available balances for the provided game.
+        // deposited balances for the provided game.
         bytes32 winKey = balHash(win, grd);
         // Create the loser key. This key points to the loser's allocated
         // balance for the provided game.
@@ -470,20 +470,20 @@ contract Registry is AccessControlEnumerable {
     //
     //
 
-    // searchBalance allows anyone to search for the allocated, available and
+    // searchBalance allows anyone to search for the allocated, deposited and
     // historic balances of any player. The allocated user balance represents
     // all funds currently bound to a game being played. Those funds are locked
     // until the respective game resolution distributes them accordingly.
     // Allocated balances grow by entering games and killing other players
-    // within those games. The available user balance represents all funds
+    // within those games. The deposited user balance represents all funds
     // distributed to players who have won against other players upon kill state
-    // resolution. Those available funds may be withdrawn any time. The
+    // resolution. Those deposited funds may be withdrawn any time. The
     // historical balances provide an insight into a players performance over
     // time. The assumption is that the higher a player's historical net gain
     // is, the better of a player they are.
     //
     //     out[0] the allocated user balance
-    //     out[1] the available user balance
+    //     out[1] the deposited user balance
     //     out[2] the historic net gain
     //
     function searchBalance(
@@ -491,7 +491,7 @@ contract Registry is AccessControlEnumerable {
     ) public view returns (uint256, uint256, uint256) {
         return (
             _allocBalance[balHash(wal, _walletGuardian[wal])],
-            _availBalance[wal],
+            _depositedBalance[wal],
             _historicGain[wal]
         );
     }
@@ -599,23 +599,23 @@ contract Registry is AccessControlEnumerable {
 
         uint256 grdBal;
         uint256 ownBal;
-        uint256 avlBal;
+        uint256 depBal;
         {
             grdBal = (_allocBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
             ownBal = (_allocBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            avlBal = _allocBalance[losKey] - (grdBal + ownBal);
+            depBal = _allocBalance[losKey] - (grdBal + ownBal);
         }
 
         {
             _allocBalance[losKey] = 0;
-            _availBalance[los] += avlBal;
+            _depositedBalance[los] += depBal;
             _walletGuardian[los] = address(0);
-            _availBalance[grd] += grdBal;
-            _availBalance[owner] += ownBal;
+            _depositedBalance[grd] += grdBal;
+            _depositedBalance[owner] += ownBal;
         }
 
         {
-            emit Resolve(grd, kil, win, los, avlBal, buyin);
+            emit Resolve(grd, kil, win, los, depBal, buyin);
         }
     }
 
@@ -639,16 +639,16 @@ contract Registry is AccessControlEnumerable {
         // aloBal is the amount of tokens distributed to the winner's allocated
         // balance.
         uint256 aloBal;
-        // avlBal is the amount of tokens distributed to the winner's available
+        // depBal is the amount of tokens distributed to the winner's deposited
         // balance.
-        uint256 avlBal;
+        uint256 depBal;
 
         unchecked {
             feeBal = (_allocBalance[losKey] * BASIS_FEE) / BASIS_TOTAL;
             grdBal = (_allocBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
             ownBal = _allocBalance[losKey] - (feeBal + grdBal);
             aloBal = (feeBal * BASIS_SPLIT) / BASIS_TOTAL;
-            avlBal = (feeBal - aloBal);
+            depBal = (feeBal - aloBal);
         }
 
         unchecked {
@@ -658,15 +658,15 @@ contract Registry is AccessControlEnumerable {
             // player eventually, then this new winning player wins a bigger
             // allocation.
             _allocBalance[winKey] += aloBal;
-            // Move half of the allocated loser balance to the available winner
+            // Move half of the allocated loser balance to the deposited winner
             // balance. This secures some of the winnings so that winners may
             // recoup their entry allocation and eventually get away with
             // profits.
-            _availBalance[win] += avlBal;
-            // Add the increase in available balance to the historical net gain
+            _depositedBalance[win] += depBal;
+            // Add the increase in deposited balance to the historical net gain
             // of the winner player. The amount of tokens added here is the
             // cumulative value that winning players earn over time.
-            _historicGain[win] += avlBal;
+            _historicGain[win] += depBal;
             // Remove the buyin amount from the historical net gain of the
             // losing player. This reduces the historical performance of losing
             // players up to zero.
@@ -683,21 +683,21 @@ contract Registry is AccessControlEnumerable {
             // enables the losing player to enter any game again, if they wish
             // to.
             _walletGuardian[los] = address(0);
-            // Make the guardian fees available for the guardian address
+            // Make the guardian fees deposited for the guardian address
             // resolving this game state.
-            _availBalance[grd] += grdBal;
-            // Make the protocol fees available for the protocol owner. The
+            _depositedBalance[grd] += grdBal;
+            // Make the protocol fees deposited for the protocol owner. The
             // amount that the protocol earns is the rest of the loser's
             // allocation, after deducting the winner's allocation and the
             // guardian fees. This rest amount includes any eventual precision
             // loss.
-            _availBalance[owner] += ownBal;
+            _depositedBalance[owner] += ownBal;
         }
 
         // Emit an event for the guardian resolution. This allows us to filter
         // for events resolved by a particular guardian.
         {
-            emit Resolve(grd, kil, win, los, avlBal, buyin);
+            emit Resolve(grd, kil, win, los, depBal, buyin);
         }
     }
 
@@ -740,7 +740,7 @@ contract Registry is AccessControlEnumerable {
         bytes memory sgn
     ) private view {
         // wal is the user's Wallet address which is attempting to deposit the
-        // provided amount as available balance.
+        // provided amount as deposited balance.
         address wal = msg.sender;
         // rec is the user's Signer address that generated the provided
         // signature. This address points to the user's Wallet.

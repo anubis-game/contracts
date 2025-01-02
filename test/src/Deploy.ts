@@ -76,7 +76,7 @@ export const Deposit = async () => {
   {
     const res = await Registry.searchBalance(wal.address);
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -110,12 +110,12 @@ export const Deposit = async () => {
     expect(await Stablecoin.balanceOf(pla.address)).to.equal(0);
   }
 
-  // After the deposit, the Wallet address should have the full available
+  // After the deposit, the Wallet address should have the full deposited
   // balance accounted for.
   {
     const res = await Registry.searchBalance(wal.address);
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(Amount(30)); // available
+    expect(res[1]).to.equal(Amount(30)); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -164,7 +164,7 @@ export const RequestForWallet = (ind: number[]) => {
       {
         const res = await Registry.searchBalance(wal.address);
         expect(res[0]).to.equal(0); // allocated
-        expect(res[1]).to.equal(0); // available
+        expect(res[1]).to.equal(0); // deposited
         expect(res[2]).to.equal(0); // historic
       }
 
@@ -189,12 +189,12 @@ export const RequestForWallet = (ind: number[]) => {
         expect(await Stablecoin.balanceOf(pla.address)).to.equal(0);
       }
 
-      // After the deposit, the Wallet address should have the full available
+      // After the deposit, the Wallet address should have the full deposited
       // balance accounted for.
       {
         const res = await Registry.searchBalance(wal.address);
         expect(res[0]).to.equal(0); // allocated
-        expect(res[1]).to.equal(Amount(10)); // available
+        expect(res[1]).to.equal(Amount(10)); // deposited
         expect(res[2]).to.equal(0); // historic
       }
 
@@ -210,11 +210,11 @@ export const RequestForWallet = (ind: number[]) => {
       }
 
       // After the request, the Wallet address should have allocated some buy-in
-      // amount, which got deducted from the available balance.
+      // amount, which got deducted from the deposited balance.
       {
         const res = await Registry.searchBalance(wal.address);
         expect(res[0]).to.equal(Amount(1)); // allocated
-        expect(res[1]).to.equal(Amount(9)); // available
+        expect(res[1]).to.equal(Amount(9)); // deposited
         expect(res[2]).to.equal(0); // historic
       }
     }
@@ -240,7 +240,7 @@ export const Resolve = async () => {
       Kill(1001),
       Address(5),
       Address(8),
-      Amount(0.4), // Signer 5 had a buy-in of 1.0, less 0.2 in fees (0.8), half made available (0.4).
+      Amount(0.4), // Signer 5 had a buy-in of 1.0, less 0.2 in fees (0.8), half made deposited (0.4).
       Amount(1) // Signer 8 had a buy-in of 1.0 and lost it all.
     );
   }
@@ -249,7 +249,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(0));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(Amount(0.1)); // available
+    expect(res[1]).to.equal(Amount(0.1)); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -257,7 +257,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(1));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(Amount(0.1)); // available
+    expect(res[1]).to.equal(Amount(0.1)); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -265,7 +265,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(2));
     expect(res[0]).to.equal(Amount(1)); // allocated
-    expect(res[1]).to.equal(Amount(9)); // available
+    expect(res[1]).to.equal(Amount(9)); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -273,7 +273,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(3));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -281,7 +281,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(4));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -289,7 +289,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(5));
     expect(res[0]).to.equal(Amount(1.4)); // allocated
-    expect(res[1]).to.equal(Amount(9.4)); // available
+    expect(res[1]).to.equal(Amount(9.4)); // deposited
     expect(res[2]).to.equal(Amount(0.4)); // historic
   }
 
@@ -297,7 +297,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(6));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -305,7 +305,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(7));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -313,7 +313,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(8));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(Amount(9)); // available
+    expect(res[1]).to.equal(Amount(9)); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -321,7 +321,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(9));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
@@ -329,7 +329,7 @@ export const Resolve = async () => {
   {
     const res = await Registry.searchBalance(Address(10));
     expect(res[0]).to.equal(0); // allocated
-    expect(res[1]).to.equal(0); // available
+    expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
