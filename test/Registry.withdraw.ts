@@ -4,7 +4,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { Resolve } from "./src/Deploy";
 
 describe("Registry", function () {
-  describe("withdraw", function () {
+  describe("Withdraw", function () {
     it("should allow signer 2 to withdraw their funds", async function () {
       const { Address, Registry, Signer, Stablecoin } = await loadFixture(Resolve);
 
@@ -18,14 +18,14 @@ describe("Registry", function () {
       }
 
       {
-        const res = await Registry.searchBalance(Address(2));
+        const res = await Registry.SearchBalance(Address(2));
         expect(res[0]).to.equal(Amount(1)); // allocated
         expect(res[1]).to.equal(Amount(9)); // deposited
         expect(res[2]).to.equal(0); // historic
       }
 
       {
-        await Registry.connect(Signer(2)).withdraw(Amount(3));
+        await Registry.connect(Signer(2)).Withdraw(Amount(3));
       }
 
       {
@@ -34,14 +34,14 @@ describe("Registry", function () {
       }
 
       {
-        const res = await Registry.searchBalance(Address(2));
+        const res = await Registry.SearchBalance(Address(2));
         expect(res[0]).to.equal(Amount(1)); // allocated
         expect(res[1]).to.equal(Amount(6)); // deposited                            -3
         expect(res[2]).to.equal(0); // historic
       }
 
       {
-        await Registry.connect(Signer(2)).withdraw(Amount(6));
+        await Registry.connect(Signer(2)).Withdraw(Amount(6));
       }
 
       {
@@ -50,7 +50,7 @@ describe("Registry", function () {
       }
 
       {
-        const res = await Registry.searchBalance(Address(2));
+        const res = await Registry.SearchBalance(Address(2));
         expect(res[0]).to.equal(Amount(1)); // allocated
         expect(res[1]).to.equal(0); // deposited                                    -6
         expect(res[2]).to.equal(0); // historic

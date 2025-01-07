@@ -8,7 +8,7 @@ import { RequestSignature } from "./src/Signature";
 import { toHex } from "viem";
 
 describe("Registry", function () {
-  describe("recoverSigner", function () {
+  describe("RecoverSigner", function () {
     it("should sign message and recover signer address for deposit", async function () {
       const { Registry, Signer } = await loadFixture(Deploy);
 
@@ -25,8 +25,8 @@ describe("Registry", function () {
       });
 
       {
-        const msg = await Registry.depositMessage(tim, wal);
-        const rec = await Registry.recoverSigner(msg, sgn);
+        const msg = await Registry.DepositMessage(tim, wal);
+        const rec = await Registry.RecoverSigner(msg, sgn);
         expect(rec).to.equal(sig.address);
       }
     });
@@ -48,8 +48,8 @@ describe("Registry", function () {
       });
 
       {
-        const msg = await Registry.requestMessage(grd, tim, pla);
-        const rec = await Registry.recoverSigner(msg, sgn);
+        const msg = await Registry.RequestMessage(grd, tim, pla);
+        const rec = await Registry.RecoverSigner(msg, sgn);
         expect(rec).to.equal(sig.address);
       }
     });
@@ -65,7 +65,7 @@ describe("Registry", function () {
         "0x0c603eabb538d2600b96faf74a0e05ad7b2cac9a8ff9f67edb0ce3221aacdc7750a0278f92262920b4b3531df2a4102025099cab500a01c22bd57ac8998bcd8d1c";
 
       {
-        const rec = await Registry.recoverSigner(str, sgn);
+        const rec = await Registry.RecoverSigner(str, sgn);
         expect(rec).to.equal("0x3d02e24E075a939586Ac2613Be5AF69418a5807A");
       }
     });

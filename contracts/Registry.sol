@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IToken} from "./interface/IToken.sol";
@@ -10,7 +9,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
-contract Registry is AccessControlEnumerable {
+contract Registry {
     //
     // ERRORS
     //
@@ -29,11 +28,11 @@ contract Registry is AccessControlEnumerable {
     // EVENTS
     //
 
-    // Report is emitted when a Player reports an observed kill state that they
-    // themselves witnessed based on the game state that the Guardian streamed
-    // to them. Report helps to increase the platform's credible neutrality,
-    // because every Player may prove to others that they see the same game
-    // state from their own point of view like everyone else.
+    // WitnessPublish is emitted when a Player reports an observed kill state
+    // that they themselves witnessed based on the game state that the Guardian
+    // streamed to them. Report helps to increase the platform's credible
+    // neutrality, because every Player may prove to others that they see the
+    // same game state from their own point of view like everyone else.
     //
     //     pla is the address of the player reporting this kill state
     //     grd is the address of the guardian resolving this kill state
@@ -41,30 +40,31 @@ contract Registry is AccessControlEnumerable {
     //     win is the address of the winning player being reported
     //     los is the address of the losing player being reported
     //
-    event Report(
+    event WitnessPublish(
         address indexed pla,
         address indexed grd,
         uint256 kil,
         address win,
         address los
     );
-    // Resolve is emitted when a Guardian resolves some kill state. When this
-    // event is emitted, then all relevant Player balances have been updated.
+    // GuardianResolve is emitted when a Guardian resolves some kill state. When
+    // this event is emitted, then all relevant Player balances have been
+    // updated.
     //
     //     grd is the address of the guardian resolving this kill state
     //     kil is the ID of the kill state itself being resolved
     //     win is the address of the winning player being resolved
     //     los is the address of the losing player being resolved
     //     dep is the amount of tokens won by the winning player
-    //     bin is the amount of tokens lost by the losing player
+    //     buy is the amount of tokens lost by the losing player
     //
-    event Resolve(
+    event GuardianResolve(
         address indexed grd,
         uint256 kil,
         address win,
         address los,
         uint256 dep,
-        uint256 bin
+        uint256 buy
     );
 
     //
@@ -75,7 +75,7 @@ contract Registry is AccessControlEnumerable {
     // smart contract. Allocated balances may increase by entering games. The
     // allocated balance is the part of the player balance that cannot be
     // withdrawn until the allocated game state is resolved.
-    mapping(bytes32 => uint256) private _allocatedBalance;
+    mapping(address => uint256) private _allocatedBalance;
     // _depositedBalance contains the deposited balance every player has in this
     // smart contract. Deposited balances may increase if players kill other
     // players. The deposited balance is the part of the player balance that can
@@ -90,12 +90,16 @@ contract Registry is AccessControlEnumerable {
     // can replicate settings comparable to poker tables with varying blind
     // sizes.
     mapping(address => uint256) private _historicGain;
+    // _playerWallet
+    mapping(address => address) private _playerWallet;
     // _signerWallet
     mapping(address => address) private _signerWallet;
     // _walletGuardian
     mapping(address => address) private _walletGuardian;
     // _walletSigner
     mapping(address => address) private _walletSigner;
+    // _walletTimestamp
+    mapping(address => uint64) private _walletTimestamp;
     // _witnessReport
     mapping(bytes32 => bytes32) private _witnessReport;
 
@@ -116,8 +120,8 @@ contract Registry is AccessControlEnumerable {
     // constant is not used anywhere, but only represented here for completeness
     // and documentation. The process of updating user balances distributes
     // funds to everyone who is owed their fair share as implemented by this
-    // smart contract. The remainder is then given to the protocol owner, which
-    // is also how we account for precision loss.
+    // smart contract. The remainder is then given to the beneficiary address,
+    // which is also how we account for precision loss.
     uint16 public constant BASIS_PROTOCOL = 1_000;
     // BASIS_SPLIT is the amount in basis points that splits loser allocations,
     // so that we can distribute towards the winners allocated and deposited
@@ -135,12 +139,12 @@ contract Registry is AccessControlEnumerable {
     // VARIABLES
     //
 
+    // beneficiary is the address of the privileged entity receiving protocol
+    // fees.
+    address public beneficiary;
     // buyin is the amount of tokens required that every player has to allocate
     // in order to enter a game.
     uint256 public immutable buyin;
-    // owner is the owner address of the privileged entity receiving protocol
-    // fees.
-    address public owner;
     // token is the token address for this instance of the deployed contract.
     // That means every deployed contract is only responsible for serving games
     // denominated in any given token address.
@@ -154,10 +158,10 @@ contract Registry is AccessControlEnumerable {
     // the provided token address, which is immutable, meaning any Registry
     // instance will only ever use a single token. Multiple Registry instances
     // may be deployed to support multiple tokens across the platform.
-    constructor(address own, address tok, uint256 buy) {
-        if (own == address(0)) {
+    constructor(address ben, address tok, uint256 buy) {
+        if (ben == address(0)) {
             revert Address(
-                "Owner address invalid. The given owner must not be zero address."
+                "Owner address invalid. The given beneficiary must not be zero address."
             );
         }
 
@@ -171,7 +175,7 @@ contract Registry is AccessControlEnumerable {
         // fact an ERC20. We are simply trying to call some function provided
         // with that interface and assume we have a real ERC20. This check
         // guards at least against EOAs, so that it is not possible anymore to
-        // confuse the owner address with the token address.
+        // confuse the beneficiary address with the token address.
         {
             IToken(tok).totalSupply();
         }
@@ -191,12 +195,8 @@ contract Registry is AccessControlEnumerable {
         }
 
         {
-            _grantRole(DEFAULT_ADMIN_ROLE, own);
-        }
-
-        {
+            beneficiary = ben;
             buyin = buy;
-            owner = own;
             token = tok;
         }
     }
@@ -206,11 +206,6 @@ contract Registry is AccessControlEnumerable {
     // PUBLIC
     //
     //
-
-    // TODO provide escape hatch for users to withdraw their buyin if they did
-    // not die after e.g. 1 hour, this also means the Guardian has to stop
-    // serving clients that have not been reconciled within this maximum time
-    // period
 
     // The user's Wallet may sign a transaction once in order to deposit tokens
     // into the Registry by proving ownership over a delegated Signer. An
@@ -225,7 +220,7 @@ contract Registry is AccessControlEnumerable {
     // Player, which will then allocate the user's deposited balance, but only
     // on behalf of the user's Wallet. Neither the Signer nor the Player will
     // ever be able to withdraw user funds from the Registry.
-    function deposit(
+    function Deposit(
         uint256 bal,
         uint64 tim,
         address sig,
@@ -247,8 +242,7 @@ contract Registry is AccessControlEnumerable {
         // Only if this succeeds we can credit the transferred deposited balance
         // to the internal account of the calling Wallet.
         {
-            verifySigner(tim, sig, sgn);
-            updateSigner(sig);
+            deposit(tim, sig, sgn);
         }
 
         // Credit the Wallet address with the deposited amount. The deposited
@@ -257,6 +251,41 @@ contract Registry is AccessControlEnumerable {
         {
             _depositedBalance[wal] += bal;
         }
+    }
+
+    // Every Guardian is obligated to release every active player after a
+    // maximum of 3 hours. After that grace period, every user is free to
+    // escape, if their associated Guardian has not yet released the given
+    // player. Escaping allows every player to release themselves in case a
+    // faulty Guardian keeps players stuck in a game. The assumption made here
+    // is that no game activity takes more than 3 hours, meaning, after 3 hours
+    // every player should have been killed at least once, effectively releasing
+    // said player and resetting their registration timestamp.
+    function Escape(address grd) public {
+        // pla
+        address pla = msg.sender;
+        // wal
+        address wal = _playerWallet[pla];
+        // tim
+        uint64 tim = _walletTimestamp[wal];
+
+        if (tim + 3 hours > block.timestamp) {
+            revert Process(
+                "Wallet escape invalid. The associated Wallet must wait 3 hours before escaping."
+            );
+        }
+
+        release(grd, wal);
+    }
+
+    // Releasing a losing player is done by the respective Guardian in case a
+    // player got killed by the environment, e.g. bots or obstacles. In such a
+    // case there is no winning player, but the losing player has to be resolved
+    // anyway. Upon release, the losing player will receive their allocated
+    // balance back, minus the relevant Guardian and Protocol fees required to
+    // cover operational costs.
+    function Release(address los) public {
+        release(msg.sender, los);
     }
 
     // The Player signs a transaction to request participation in a new game by
@@ -273,7 +302,7 @@ contract Registry is AccessControlEnumerable {
     // write, a transaction hash will be produced onchain, which will become an
     // input parameter for establishing an authorized WebSocket connection in
     // the next step.
-    function request(
+    function Request(
         address grd,
         uint64 tim,
         address wal,
@@ -284,14 +313,7 @@ contract Registry is AccessControlEnumerable {
         address pla = msg.sender;
         // rec is the user's Signer address that generated the provided
         // signature. This address points to the user's Wallet.
-        address rec = recoverSigner(requestMessage(grd, tim, pla), sgn);
-        // dep is the user's deposited balance that the Player is authorized
-        // through the delegated Signer to use in order to request participation
-        // in a new game.
-        uint256 dep = _depositedBalance[wal];
-        // Create the balance key. This key points to the player's allocated and
-        // deposited balances for the provided game.
-        bytes32 key = balHash(wal, grd);
+        address rec = RecoverSigner(RequestMessage(grd, tim, pla), sgn);
 
         // Ensure that the given timestamp cannot be too far in the future. This
         // restricts the potential entropy for signature forgery.
@@ -335,13 +357,21 @@ contract Registry is AccessControlEnumerable {
         // Any tokens missing will be requested from the configured token
         // contract. The caller then needs to provide an allowance that is able
         // to cover the difference transferred.
-        if (dep >= buyin) {
+        if (_depositedBalance[wal] >= buyin) {
             _depositedBalance[wal] -= buyin;
         } else {
             revert Balance(
                 "Deposited balance insufficient. Minimum buyin required.",
                 buyin
             );
+        }
+
+        if (_playerWallet[pla] != wal) {
+            _playerWallet[pla] = wal;
+        }
+
+        {
+            _walletTimestamp[wal] = tim;
         }
 
         // Track the user's allocated balance so we can tell people where they
@@ -353,13 +383,121 @@ contract Registry is AccessControlEnumerable {
         // their Player is rewarded upon killing another Player within the scope
         // of a played game.
         {
-            _allocatedBalance[key] = buyin;
+            _allocatedBalance[wal] = buyin;
         }
     }
 
-    // withdraw allows anyone to withdraw their own deposited balance any time
+    // publish allows any Player to report kill state for any game exactly once.
+    //
+    //     inp[0] the ID of the kill state being reported
+    //     inp[1] the address of the winning player being reported
+    //     inp[2] the address of the losing player being reported
+    //
+    function Publish(uint256 kil, address win, address los) public {
+        // pla
+        address pla = msg.sender;
+        // wal
+        address wal = _playerWallet[pla];
+        // grd
+        address grd = _walletGuardian[wal];
+        // Create the witness key. This key tells us what the user reported.
+        bytes32 witKey = keccak256(abi.encodePacked(pla, "-", kil));
+
+        // Ensure that the publishing player is in fact participating in any game.
+        if (grd == address(0)) {
+            revert Process(
+                "Witness report invalid. Witness address is not playing any game."
+            );
+        }
+
+        // Ensure that the winning Player has in fact requested to be resolved by
+        // the provided Guardian address.
+        if (_walletGuardian[win] != grd) {
+            revert Address(
+                "Witness report invalid. Winning address not mapped to Guardian address."
+            );
+        }
+
+        // Ensure that the losing Player has in fact requested to be resolved by
+        // the provided Guardian address.
+        if (_walletGuardian[los] != grd) {
+            revert Address(
+                "Witness report invalid. Losing address not mapped to Guardian address."
+            );
+        }
+
+        // Track the kill state based on the data that the witness reported, and
+        // ensure that every witness can only report once.
+        if (_witnessReport[witKey] == bytes32(0)) {
+            _witnessReport[witKey] = keccak256(abi.encodePacked(win, "-", los));
+        } else {
+            revert Process(
+                "Witness report invalid. Witness address has already reported."
+            );
+        }
+
+        // Emit an event for the witness report. This allows us to filter for
+        // events reported by a particular witness for a particular guardian.
+        {
+            emit WitnessPublish(pla, grd, kil, win, los);
+        }
+    }
+
+    function Resolve(uint256 kil, address win, address los) public {
+        // grd
+        address grd = msg.sender;
+
+        // Ensure that the winning Player has in fact requested to be resolved
+        // by the provided Guardian address.
+        if (_walletGuardian[win] != grd) {
+            revert Address(
+                "Guardian resolve invalid. Winning address not mapped to Guardian address."
+            );
+        }
+
+        // Ensure that the losing Player has in fact requested to be resolved
+        // by the provided Guardian address.
+        if (_walletGuardian[los] != grd) {
+            revert Address(
+                "Guardian resolve invalid. Losing address not mapped to Guardian address."
+            );
+        }
+
+        {
+            resolve(grd, kil, win, los);
+        }
+    }
+
+    // UpdateBeneficiary allows the current beneficiary to update itself. The
+    // new address "ben" must not be the zero address, and it must not be the
+    // current beneficiary.
+    function UpdateBeneficiary(address ben) public {
+        if (msg.sender != beneficiary) {
+            revert Address(
+                "Contract write unauthorized. The sender address must be the current beneficiary."
+            );
+        }
+
+        if (ben == address(0)) {
+            revert Address(
+                "Beneficiary address invalid. The given address must not be zero."
+            );
+        }
+
+        if (ben == beneficiary) {
+            revert Address(
+                "Beneficiary address invalid. The given address is already the beneficiary."
+            );
+        }
+
+        {
+            beneficiary = ben;
+        }
+    }
+
+    // Withdraw allows anyone to withdraw their own deposited balance any time
     // as distributed by this smart contract.
-    function withdraw(uint256 bal) public {
+    function Withdraw(uint256 bal) public {
         // use is the caller's address which is attempting to withdraw the
         // provided amount of deposited tokens.
         address use = msg.sender;
@@ -376,102 +514,13 @@ contract Registry is AccessControlEnumerable {
         }
     }
 
-    // report allows any Player to report kill state for any game exactly once.
-    //
-    //     inp[0] the guardian address facilitating this game
-    //     inp[1] the ID of the kill state being reported
-    //     inp[2] the address of the winning player being reported
-    //     inp[3] the address of the losing player being reported
-    //
-    function report(address grd, uint256 kil, address win, address los) public {
-        // pla
-        address pla = msg.sender;
-        // Create the witness key. This key tells us what the user reported.
-        bytes32 witKey = keyHash(pla, kil);
-        // Create the kill value. This value tells us who won and who lost.
-        bytes32 kilVal = valHash(win, los);
-
-        // Track the kill state based on the data that the witness reported, and
-        // ensure that every witness can only report once.
-        if (_witnessReport[witKey] != bytes32(0)) {
-            revert Process(
-                "Witness report invalid. Witness address has already reported."
-            );
-        } else {
-            _witnessReport[witKey] = kilVal;
-        }
-
-        // Emit an event for the witness report. This allows us to filter for
-        // events reported by a particular witness for a particular guardian.
-        {
-            emit Report(pla, grd, kil, win, los);
-        }
-    }
-
-    function resolve(uint256 kil, address win, address los) public {
-        // grd
-        address grd = msg.sender;
-        // Create the winner key. This key points to the winner's allocated and
-        // deposited balances for the provided game.
-        bytes32 winKey = balHash(win, grd);
-        // Create the loser key. This key points to the loser's allocated
-        // balance for the provided game.
-        bytes32 losKey = balHash(los, grd);
-
-        // Ensure that the winning Player has in fact requested to be resolved
-        // by the provided Guardian address.
-        if (_walletGuardian[win] != grd) {
-            revert Address(
-                "Guardian resolve invalid. Guardian address not mapped to winning address."
-            );
-        }
-
-        // Ensure that the losing Player has in fact requested to be resolved
-        // by the provided Guardian address.
-        if (_walletGuardian[los] != grd) {
-            revert Address(
-                "Guardian resolve invalid. Guardian address not mapped to losing address."
-            );
-        }
-
-        // Ensure that the winning Player has in fact an allocated balance. An
-        // Address without an allocated balance does not participate in the game
-        // and can therefore not be resolved.
-        if (_allocatedBalance[winKey] == 0) {
-            revert Process(
-                "Guardian resolve invalid. Winning address has no allocated balance."
-            );
-        }
-
-        // Ensure that the losing Player has in fact an allocated balance. An
-        // Address without an allocated balance does not participate in the game
-        // and can therefore not be resolved.
-        if (_allocatedBalance[losKey] == 0) {
-            revert Process(
-                "Guardian resolve invalid. Losing address has no allocated balance."
-            );
-        }
-
-        // In case the losing player got killed by a bot, then there is no
-        // allocated balance to win. That also means there is no balance to lose
-        // other than the guardian and protocol fees used to cover operational
-        // expenses. So in case any player got defeated by a bot we simply free
-        // all allocated resources in order for the defeated player to start
-        // over again.
-        if (win == address(0)) {
-            return resolveBot(grd, kil, win, los);
-        } else {
-            return resolveWin(grd, kil, win, los);
-        }
-    }
-
     //
     //
-    // PUBLIC VIEW SEARCH
+    // PUBLIC VIEW
     //
     //
 
-    // searchBalance allows anyone to search for the allocated, deposited and
+    // SearchBalance allows anyone to search for the allocated, deposited and
     // historic balances of any player. The allocated user balance represents
     // all funds currently bound to a game being played. Those funds are locked
     // until the respective game resolution distributes them accordingly.
@@ -487,24 +536,24 @@ contract Registry is AccessControlEnumerable {
     //     out[1] the deposited user balance
     //     out[2] the historic net gain
     //
-    function searchBalance(
+    function SearchBalance(
         address wal
     ) public view returns (uint256, uint256, uint256) {
         return (
-            _allocatedBalance[balHash(wal, _walletGuardian[wal])],
+            _allocatedBalance[wal],
             _depositedBalance[wal],
             _historicGain[wal]
         );
     }
 
-    // searchSigner allows anyone to verify the Signer mapping for the given
+    // SearchSigner allows anyone to verify the Signer mapping for the given
     // address. If our internal delegation process is intact, then the first
     // address returned here is the provided Wallet address itself, and the
     // second address is the respective delegated Signer address. If a Wallet
     // has an active delegated Signer, and if the two aforementioned assumptions
     // turn out to be false, then the internal delegation process is broken and
     // this smart contract may be considered exploitable.
-    function searchSigner(address wal) public view returns (address, address) {
+    function SearchSigner(address wal) public view returns (address, address) {
         address sig = _walletSigner[wal];
         address cur = _signerWallet[sig];
 
@@ -513,30 +562,12 @@ contract Registry is AccessControlEnumerable {
 
     //
     //
-    // PUBLIC PURE HASH
+    // PUBLIC PURE
     //
     //
 
-    function balHash(address wal, address grd) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(wal, "-", grd));
-    }
-
-    function keyHash(address wog, uint256 kil) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(wog, "-", kil));
-    }
-
-    function valHash(address win, address los) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(win, "-", los));
-    }
-
-    //
-    //
-    // PUBLIC PURE SIGNATURE
-    //
-    //
-
-    //
-    function recoverSigner(
+    // TODO document
+    function RecoverSigner(
         bytes memory mes,
         bytes memory sgn
     ) public pure returns (address) {
@@ -553,7 +584,8 @@ contract Registry is AccessControlEnumerable {
             );
     }
 
-    function depositMessage(
+    // TODO document
+    function DepositMessage(
         uint64 tim,
         address wal
     ) public pure returns (bytes memory) {
@@ -567,7 +599,8 @@ contract Registry is AccessControlEnumerable {
             );
     }
 
-    function requestMessage(
+    // TODO document
+    function RequestMessage(
         address grd,
         uint64 tim,
         address pla
@@ -586,166 +619,23 @@ contract Registry is AccessControlEnumerable {
 
     //
     //
-    // PRIVATE RESOLVE
+    // PRIVATE
     //
     //
 
-    function resolveBot(
-        address grd,
-        uint256 kil,
-        address win,
-        address los
-    ) private {
-        bytes32 losKey = balHash(los, grd);
+    // Verify the given signer address and associate the verified Signer with
+    // the calling Wallet.
+    function deposit(uint64 tim, address sig, bytes memory sgn) private {
+        //
+        // verify
+        //
 
-        uint256 grdBal;
-        uint256 ownBal;
-        uint256 depBal;
-        {
-            grdBal = (_allocatedBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            ownBal = (_allocatedBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            depBal = _allocatedBalance[losKey] - (grdBal + ownBal);
-        }
-
-        {
-            _allocatedBalance[losKey] = 0;
-            _depositedBalance[los] += depBal;
-            _walletGuardian[los] = address(0);
-            _depositedBalance[grd] += grdBal;
-            _depositedBalance[owner] += ownBal;
-        }
-
-        {
-            emit Resolve(grd, kil, win, los, depBal, buyin);
-        }
-    }
-
-    function resolveWin(
-        address grd,
-        uint256 kil,
-        address win,
-        address los
-    ) private {
-        bytes32 winKey = balHash(win, grd);
-        // Create the loser key. This key points to the loser's allocated
-        // balance for the provided game.
-        bytes32 losKey = balHash(los, grd);
-
-        // feeBal is the amount of tokens distributed to the winner.
-        uint256 feeBal;
-        // grdBal is the amount of tokens distributed to the guardian.
-        uint256 grdBal;
-        // ownBal is the amount of tokens distributed to the protocol.
-        uint256 ownBal;
-        // aloBal is the amount of tokens distributed to the winner's allocated
-        // balance.
-        uint256 aloBal;
-        // depBal is the amount of tokens distributed to the winner's deposited
-        // balance.
-        uint256 depBal;
-
-        unchecked {
-            feeBal = (_allocatedBalance[losKey] * BASIS_FEE) / BASIS_TOTAL;
-            grdBal = (_allocatedBalance[losKey] * BASIS_GUARDIAN) / BASIS_TOTAL;
-            ownBal = _allocatedBalance[losKey] - (feeBal + grdBal);
-            aloBal = (feeBal * BASIS_SPLIT) / BASIS_TOTAL;
-            depBal = (feeBal - aloBal);
-        }
-
-        unchecked {
-            // Move half of the allocated loser balance to the allocated winner
-            // balance. This makes the game allocation of the winning player
-            // bigger. If this winning player is going to be defeated by another
-            // player eventually, then this new winning player wins a bigger
-            // allocation.
-            _allocatedBalance[winKey] += aloBal;
-            // Move half of the allocated loser balance to the deposited winner
-            // balance. This secures some of the winnings so that winners may
-            // recoup their entry allocation and eventually get away with
-            // profits.
-            _depositedBalance[win] += depBal;
-            // Add the increase in deposited balance to the historical net gain
-            // of the winner player. The amount of tokens added here is the
-            // cumulative value that winning players earn over time.
-            _historicGain[win] += depBal;
-            // Remove the buyin amount from the historical net gain of the
-            // losing player. This reduces the historical performance of losing
-            // players up to zero.
-            if (_historicGain[los] < buyin) {
-                _historicGain[los] = 0;
-            } else {
-                _historicGain[los] -= buyin;
-            }
-            // Take all allocated balance away from the losing player. That
-            // enables the losing player to enter the same game again, if they
-            // wish to.
-            _allocatedBalance[losKey] = 0;
-            // Remove the game ID from the mapping of the losing player. That
-            // enables the losing player to enter any game again, if they wish
-            // to.
-            _walletGuardian[los] = address(0);
-            // Make the guardian fees deposited for the guardian address
-            // resolving this game state.
-            _depositedBalance[grd] += grdBal;
-            // Make the protocol fees deposited for the protocol owner. The
-            // amount that the protocol earns is the rest of the loser's
-            // allocation, after deducting the winner's allocation and the
-            // guardian fees. This rest amount includes any eventual precision
-            // loss.
-            _depositedBalance[owner] += ownBal;
-        }
-
-        // Emit an event for the guardian resolution. This allows us to filter
-        // for events resolved by a particular guardian.
-        {
-            emit Resolve(grd, kil, win, los, depBal, buyin);
-        }
-    }
-
-    //
-    //
-    // PRIVATE SIGNER
-    //
-    //
-
-    // updateSigner associates the given Signer address with the calling Wallet
-    // address. It is important that updateSigner is only called after
-    // successful verification of a signature challenge. That is why this
-    // function is private.
-    function updateSigner(address sig) private {
-        // wal is the user's Wallet address attempting to update its own Signer.
-        address wal = msg.sender;
-        // sws
-        address sws = _signerWallet[sig];
-        // wsw
-        address wsw = _walletSigner[wal];
-
-        // Ensure that we delete the old Signer that might be replaced by this
-        // update cycle.
-        if (sws == address(0) && wsw != address(0)) {
-            delete _signerWallet[wsw];
-        }
-
-        // Track the Wallet-Signer relationship for lookups from both
-        // directions. Eventually we need to know which Signer points to which
-        // Wallet, and which Wallet points to which Signer.
-        {
-            _signerWallet[sig] = wal;
-            _walletSigner[wal] = sig;
-        }
-    }
-
-    function verifySigner(
-        uint64 tim,
-        address sig,
-        bytes memory sgn
-    ) private view {
         // wal is the user's Wallet address which is attempting to deposit the
         // provided amount as deposited balance.
         address wal = msg.sender;
         // rec is the user's Signer address that generated the provided
         // signature. This address points to the user's Wallet.
-        address rec = recoverSigner(depositMessage(tim, wal), sgn);
+        address rec = RecoverSigner(DepositMessage(tim, wal), sgn);
 
         // Ensure that the given Signer is not the caller itself. We want to
         // implement one coherent version of account abstraction, without
@@ -787,6 +677,167 @@ contract Registry is AccessControlEnumerable {
             revert Address(
                 "Signer address invalid. The recovered Signer does not map to the provided address."
             );
+        }
+
+        //
+        // update
+        //
+
+        // sws
+        address sws = _signerWallet[sig];
+        // wsw
+        address wsw = _walletSigner[wal];
+
+        // Ensure that we delete the old Signer that might be replaced by this
+        // update cycle.
+        if (sws == address(0) && wsw != address(0)) {
+            delete _signerWallet[wsw];
+        }
+
+        // Track the Wallet-Signer relationship for lookups from both
+        // directions. Eventually we need to know which Signer points to which
+        // Wallet, and which Wallet points to which Signer.
+        {
+            _signerWallet[sig] = wal;
+            _walletSigner[wal] = sig;
+        }
+    }
+
+    // TODO document
+    function release(address grd, address los) private {
+        //
+        uint256 alo = _allocatedBalance[los];
+
+        // Ensure that the losing Player has in fact requested to be resolved
+        // by the provided Guardian address.
+        if (_walletGuardian[los] != grd) {
+            revert Address(
+                "Guardian release invalid. Wallet address not mapped to Guardian address."
+            );
+        }
+
+        // Ensure that the losing Player has in fact an allocated balance. An
+        // Address without an allocated balance does not participate in the game
+        // and can therefore not be resolved.
+        if (alo == 0) {
+            revert Process(
+                "Guardian release invalid. Wallet address has no allocated balance."
+            );
+        }
+
+        uint256 grdBal;
+        uint256 benBal;
+        uint256 depBal;
+        {
+            grdBal = (alo * BASIS_GUARDIAN) / BASIS_TOTAL;
+            benBal = (alo * BASIS_GUARDIAN) / BASIS_TOTAL;
+            depBal = (alo - (grdBal + benBal));
+        }
+
+        {
+            _depositedBalance[grd] += grdBal;
+            _depositedBalance[los] += depBal;
+            _depositedBalance[beneficiary] += benBal;
+        }
+
+        {
+            delete _allocatedBalance[los];
+            delete _walletGuardian[los];
+            delete _walletTimestamp[los];
+        }
+
+        {
+            emit GuardianResolve(grd, 0, address(0), los, depBal, buyin);
+        }
+    }
+
+    // TODO document
+    function resolve(
+        address grd,
+        uint256 kil,
+        address win,
+        address los
+    ) private {
+        //
+        uint256 aloLos = _allocatedBalance[los];
+
+        // feeBal is the amount of tokens distributed to the winner address.
+        uint256 feeBal;
+        // grdBal is the amount of tokens distributed to the guardian address.
+        uint256 grdBal;
+        // benBal is the amount of tokens distributed to the beneficiary
+        // address.
+        uint256 benBal;
+        // aloBal is the amount of tokens distributed to the winner's allocated
+        // balance.
+        uint256 aloBal;
+        // depBal is the amount of tokens distributed to the winner's deposited
+        // balance.
+        uint256 depBal;
+
+        unchecked {
+            feeBal = (aloLos * BASIS_FEE) / BASIS_TOTAL;
+            grdBal = (aloLos * BASIS_GUARDIAN) / BASIS_TOTAL;
+            benBal = (aloLos - (feeBal + grdBal));
+            aloBal = (feeBal * BASIS_SPLIT) / BASIS_TOTAL;
+            depBal = (feeBal - aloBal);
+        }
+
+        unchecked {
+            // Move half of the allocated loser balance to the allocated winner
+            // balance. This makes the game allocation of the winning player
+            // bigger. If this winning player is going to be defeated by another
+            // player eventually, then this new winning player wins a bigger
+            // allocation.
+            _allocatedBalance[win] += aloBal;
+            // Move half of the allocated loser balance to the deposited winner
+            // balance. This secures some of the winnings so that winners may
+            // recoup their entry allocation and eventually get away with
+            // profits.
+            _depositedBalance[win] += depBal;
+            // Add the increase in deposited balance to the historical net gain
+            // of the winner player. The amount of tokens added here is the
+            // cumulative value that winning players earn over time.
+            _historicGain[win] += depBal;
+        }
+
+        unchecked {
+            // Remove the buyin amount from the historical net gain of the
+            // losing player. This reduces the historical performance of losing
+            // players up to zero.
+            if (_historicGain[los] < buyin) {
+                delete _historicGain[los];
+            } else {
+                _historicGain[los] -= buyin;
+            }
+            // Take all allocated balance away from the losing player. That
+            // enables the losing player to enter the same game again, if they
+            // wish to.
+            delete _allocatedBalance[los];
+            // Remove the game ID from the mapping of the losing player. That
+            // enables the losing player to enter any game again, if they wish
+            // to.
+            delete _walletGuardian[los];
+            // Reset the registration timestamp of the losing player
+            delete _walletTimestamp[los];
+        }
+
+        unchecked {
+            // Make the guardian fees withdrawable for the guardian address
+            // resolving this game state.
+            _depositedBalance[grd] += grdBal;
+            // Make the protocol fees withdrawable for the beneficiary address.
+            // The amount that the protocol earns is the rest of the loser's
+            // allocation, after deducting the winner's allocation and the
+            // guardian fees. This rest amount includes any eventual precision
+            // loss.
+            _depositedBalance[beneficiary] += benBal;
+        }
+
+        // Emit an event for the guardian resolution. This allows us to filter
+        // for events resolved by a particular guardian.
+        {
+            emit GuardianResolve(grd, kil, win, los, depBal, buyin);
         }
     }
 }

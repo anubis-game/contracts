@@ -5,12 +5,12 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { Resolve } from "./src/Deploy";
 
 describe("Registry", function () {
-  describe("withdraw", function () {
+  describe("Withdraw", function () {
     describe("revert", function () {
       it("if signer 0 has no funds", async function () {
         const { Registry, Signer } = await loadFixture(Deploy);
 
-        const txn = Registry.connect(Signer(0)).withdraw(1);
+        const txn = Registry.connect(Signer(0)).Withdraw(1);
 
         // Arithmetic operation overflowed outside of an unchecked block.
         await expect(txn).to.be.revertedWithPanic(0x11);
@@ -19,7 +19,7 @@ describe("Registry", function () {
       it("if signer 2 has no funds", async function () {
         const { Registry, Signer } = await loadFixture(Deploy);
 
-        const txn = Registry.connect(Signer(2)).withdraw(Amount(15));
+        const txn = Registry.connect(Signer(2)).Withdraw(Amount(15));
 
         // Arithmetic operation overflowed outside of an unchecked block.
         await expect(txn).to.be.revertedWithPanic(0x11);
@@ -38,7 +38,7 @@ describe("Registry", function () {
         }
 
         {
-          const res = await Registry.searchBalance(Address(2));
+          const res = await Registry.SearchBalance(Address(2));
           expect(res[0]).to.equal(Amount(1)); // allocated
           expect(res[1]).to.equal(Amount(9)); // deposited
           expect(res[2]).to.equal(0); // historic
@@ -46,13 +46,13 @@ describe("Registry", function () {
 
         // Arithmetic operation overflowed outside of an unchecked block.
         {
-          const txn = Registry.connect(Signer(2)).withdraw(Amount(9.00001));
+          const txn = Registry.connect(Signer(2)).Withdraw(Amount(9.00001));
           await expect(txn).to.be.revertedWithPanic(0x11);
         }
 
         // Arithmetic operation overflowed outside of an unchecked block.
         {
-          const txn = Registry.connect(Signer(2)).withdraw(Amount(13));
+          const txn = Registry.connect(Signer(2)).Withdraw(Amount(13));
           await expect(txn).to.be.revertedWithPanic(0x11);
         }
       });
