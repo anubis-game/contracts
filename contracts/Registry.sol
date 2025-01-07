@@ -99,7 +99,7 @@ contract Registry {
     // _walletSigner
     mapping(address => address) private _walletSigner;
     // _walletTimestamp
-    mapping(address => uint64) private _walletTimestamp;
+    mapping(address => uint256) private _walletTimestamp;
     // _witnessReport
     mapping(bytes32 => bytes32) private _witnessReport;
 
@@ -267,8 +267,12 @@ contract Registry {
         // wal
         address wal = _playerWallet[pla];
         // tim
-        uint64 tim = _walletTimestamp[wal];
+        uint256 tim = _walletTimestamp[wal];
 
+        // Ensure that the time passed from the point of starting the game is at
+        // least 3 hours. If a player calls Escape without participating in any
+        // game, then release() below will revert, because of the missing
+        // Guardian mapping.
         if (tim + 3 hours > block.timestamp) {
             revert Process(
                 "Wallet escape invalid. The associated Wallet must wait 3 hours before escaping."
@@ -366,12 +370,18 @@ contract Registry {
             );
         }
 
+        // We need to track the relationship between Player and Wallet so that
+        // we can infer the actual Wallet address during contract writes made by
+        // the Player address. E.g. see Escape() and Publish().
         if (_playerWallet[pla] != wal) {
             _playerWallet[pla] = wal;
         }
 
+        // We track the timstamp of starting the game for every player, so that
+        // we can allow anyone who got stuck caused by a faulty Guardian to
+        // escape by themselves after a grace period of 3 hours.
         {
-            _walletTimestamp[wal] = tim;
+            _walletTimestamp[wal] = block.timestamp;
         }
 
         // Track the user's allocated balance so we can tell people where they
@@ -713,15 +723,6 @@ contract Registry {
         if (_walletGuardian[los] != grd) {
             revert Address(
                 "Guardian release invalid. Wallet address not mapped to Guardian address."
-            );
-        }
-
-        // Ensure that the losing Player has in fact an allocated balance. An
-        // Address without an allocated balance does not participate in the game
-        // and can therefore not be resolved.
-        if (alo == 0) {
-            revert Process(
-                "Guardian release invalid. Wallet address has no allocated balance."
             );
         }
 
