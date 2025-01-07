@@ -132,6 +132,12 @@ contract Registry {
     // BASIS_TOTAL is the total amount of basis points in 100%. This amount is
     // used to calculate fees and their remainders.
     uint16 public constant BASIS_TOTAL = 10_000;
+    // KILL_STATE_ESCAPE is the kill state to identify players who had to escape
+    // from faulty Guardians.
+    uint256 public constant KILL_STATE_ESCAPE = 47;
+    // KILL_STATE_RELEASE is the kill state to identify an orderly release of an
+    // active player as executed by the associated Guardian.
+    uint256 public constant KILL_STATE_RELEASE = 33;
     // VERSION is the code release of https://github.com/anubis-game/contracts.
     string public constant VERSION = "v0.3.0";
 
@@ -279,7 +285,7 @@ contract Registry {
             );
         }
 
-        release(grd, wal);
+        release(grd, KILL_STATE_ESCAPE, wal);
     }
 
     // Releasing a losing player is done by the respective Guardian in case a
@@ -289,7 +295,7 @@ contract Registry {
     // balance back, minus the relevant Guardian and Protocol fees required to
     // cover operational costs.
     function Release(address los) public {
-        release(msg.sender, los);
+        release(msg.sender, KILL_STATE_RELEASE, los);
     }
 
     // The Player signs a transaction to request participation in a new game by
@@ -397,7 +403,9 @@ contract Registry {
         }
     }
 
-    // publish allows any Player to report kill state for any game exactly once.
+    // Publish allows any witnessing Player to report the kill state for any
+    // player pair exactly once, as long as those witnesses participate in the
+    // associated games themselves.
     //
     //     inp[0] the ID of the kill state being reported
     //     inp[1] the address of the winning player being reported
@@ -714,13 +722,13 @@ contract Registry {
     }
 
     // TODO document
-    function release(address grd, address los) private {
+    function release(address grd, uint256 kil, address wal) private {
         //
-        uint256 alo = _allocatedBalance[los];
+        uint256 alo = _allocatedBalance[wal];
 
         // Ensure that the losing Player has in fact requested to be resolved
         // by the provided Guardian address.
-        if (_walletGuardian[los] != grd) {
+        if (_walletGuardian[wal] != grd) {
             revert Address(
                 "Guardian release invalid. Wallet address not mapped to Guardian address."
             );
@@ -728,27 +736,27 @@ contract Registry {
 
         uint256 grdBal;
         uint256 benBal;
-        uint256 depBal;
-        {
+        uint256 walBal;
+        unchecked {
             grdBal = (alo * BASIS_GUARDIAN) / BASIS_TOTAL;
             benBal = (alo * BASIS_GUARDIAN) / BASIS_TOTAL;
-            depBal = (alo - (grdBal + benBal));
+            walBal = (alo - (grdBal + benBal));
         }
 
-        {
+        unchecked {
             _depositedBalance[grd] += grdBal;
-            _depositedBalance[los] += depBal;
             _depositedBalance[beneficiary] += benBal;
+            _depositedBalance[wal] += walBal;
         }
 
         {
-            delete _allocatedBalance[los];
-            delete _walletGuardian[los];
-            delete _walletTimestamp[los];
+            delete _allocatedBalance[wal];
+            delete _walletGuardian[wal];
+            delete _walletTimestamp[wal];
         }
 
         {
-            emit GuardianResolve(grd, 0, address(0), los, depBal, buyin);
+            emit GuardianResolve(grd, kil, address(0), wal, walBal, buyin);
         }
     }
 
@@ -775,7 +783,6 @@ contract Registry {
         // depBal is the amount of tokens distributed to the winner's deposited
         // balance.
         uint256 depBal;
-
         unchecked {
             feeBal = (aloLos * BASIS_FEE) / BASIS_TOTAL;
             grdBal = (aloLos * BASIS_GUARDIAN) / BASIS_TOTAL;
