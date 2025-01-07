@@ -327,7 +327,7 @@ contract Registry {
 
         // Ensure that the given timestamp cannot be too far in the future. This
         // restricts the potential entropy for signature forgery.
-        if (tim >= block.timestamp + 60) {
+        if (tim >= block.timestamp + 60 seconds) {
             revert Process(
                 "Unix timestamp invalid. The timestamp must not be more than 60 seconds in the future"
             );
@@ -674,7 +674,7 @@ contract Registry {
 
         // Ensure that the given timestamp cannot be too far in the future. This
         // restricts the potential entropy for signature forgery.
-        if (tim >= block.timestamp + 60) {
+        if (tim >= block.timestamp + 60 seconds) {
             revert Process(
                 "Unix timestamp invalid. The timestamp must not be more than 60 seconds in the future"
             );
