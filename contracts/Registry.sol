@@ -139,7 +139,7 @@ contract Registry {
     // active player as executed by the associated Guardian.
     uint256 public constant KILL_STATE_RELEASE = 33;
     // VERSION is the code release of https://github.com/anubis-game/contracts.
-    string public constant VERSION = "v0.3.0";
+    string public constant VERSION = "v0.4.0";
 
     //
     // VARIABLES
