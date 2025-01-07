@@ -8,7 +8,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { zeroAddress } from "viem";
 
 describe("Registry", function () {
-  describe("deposit", function () {
+  describe("Deposit", function () {
     describe("revert", function () {
       it("if wrong wallet", async function () {
         const { Balance, Registry, Signer } = await loadFixture(Deploy);
@@ -32,18 +32,18 @@ describe("Registry", function () {
         });
 
         {
-          const txn = Registry.connect(fak).deposit(Amount(10), tim, sig.address, sg1);
+          const txn = Registry.connect(fak).Deposit(Amount(10), tim, sig.address, sg1);
           await expect(txn).to.be.revertedWithCustomError(Registry, "Address");
         }
 
         {
-          const res = await Registry.searchSigner(fak.address);
+          const res = await Registry.SearchSigner(fak.address);
           expect(res[0]).to.equal(zeroAddress);
           expect(res[1]).to.equal(zeroAddress);
         }
 
         {
-          const res = await Registry.searchSigner(wal.address);
+          const res = await Registry.SearchSigner(wal.address);
           expect(res[0]).to.equal(zeroAddress);
           expect(res[1]).to.equal(zeroAddress);
         }

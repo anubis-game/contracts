@@ -7,7 +7,7 @@ import { RequestForWallet } from "./src/Deploy";
 import { RequestSignature } from "./src/Signature";
 
 describe("Registry", function () {
-  describe("request", function () {
+  describe("Request", function () {
     describe("revert", function () {
       it("if entering the same game twice", async function () {
         const { Registry, Signer } = await loadFixture(RequestForWallet([2]));
@@ -27,7 +27,7 @@ describe("Registry", function () {
         });
 
         {
-          const txn = Registry.connect(pla).request(grd, tim, wal, sgn);
+          const txn = Registry.connect(pla).Request(grd, tim, wal, sgn);
           await expect(txn).to.be.revertedWithCustomError(Registry, "Address");
         }
       });
@@ -51,7 +51,7 @@ describe("Registry", function () {
         });
 
         {
-          const txn = Registry.connect(pla).request(grd, brk, wal, sgn);
+          const txn = Registry.connect(pla).Request(grd, brk, wal, sgn);
           await expect(txn).to.be.revertedWithCustomError(Registry, "Process");
         }
       });

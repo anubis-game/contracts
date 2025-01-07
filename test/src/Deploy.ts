@@ -74,14 +74,14 @@ export const Deposit = async () => {
   }
 
   {
-    const res = await Registry.searchBalance(wal.address);
+    const res = await Registry.SearchBalance(wal.address);
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
   }
 
   {
-    const res = await Registry.searchSigner(wal.address);
+    const res = await Registry.SearchSigner(wal.address);
     expect(res[0]).to.equal(zeroAddress);
     expect(res[1]).to.equal(zeroAddress);
   }
@@ -93,10 +93,10 @@ export const Deposit = async () => {
   });
 
   {
-    await Registry.connect(wal).deposit(Amount(10), tim, sig.address, sg1);
-    await Registry.connect(wal).deposit(Amount(5), tim, sig.address, sg1);
-    await Registry.connect(wal).deposit(Amount(10), tim, sig.address, sg1);
-    await Registry.connect(wal).deposit(Amount(5), tim, sig.address, sg1);
+    await Registry.connect(wal).Deposit(Amount(10), tim, sig.address, sg1);
+    await Registry.connect(wal).Deposit(Amount(5), tim, sig.address, sg1);
+    await Registry.connect(wal).Deposit(Amount(10), tim, sig.address, sg1);
+    await Registry.connect(wal).Deposit(Amount(5), tim, sig.address, sg1);
   }
 
   // After the deposit, the registry contract should own the deposited
@@ -113,7 +113,7 @@ export const Deposit = async () => {
   // After the deposit, the Wallet address should have the full deposited
   // balance accounted for.
   {
-    const res = await Registry.searchBalance(wal.address);
+    const res = await Registry.SearchBalance(wal.address);
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(Amount(30)); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -121,7 +121,7 @@ export const Deposit = async () => {
 
   // Test for the internal mapping between Wallet and Signer address.
   {
-    const res = await Registry.searchSigner(wal.address);
+    const res = await Registry.SearchSigner(wal.address);
     expect(res[0]).to.equal(wal.address);
     expect(res[1]).to.equal(sig.address);
   }
@@ -162,7 +162,7 @@ export const RequestForWallet = (ind: number[]) => {
       }
 
       {
-        const res = await Registry.searchBalance(wal.address);
+        const res = await Registry.SearchBalance(wal.address);
         expect(res[0]).to.equal(0); // allocated
         expect(res[1]).to.equal(0); // deposited
         expect(res[2]).to.equal(0); // historic
@@ -175,7 +175,7 @@ export const RequestForWallet = (ind: number[]) => {
       });
 
       {
-        await Registry.connect(wal).deposit(Amount(10), tim, sig.address, sg1);
+        await Registry.connect(wal).Deposit(Amount(10), tim, sig.address, sg1);
       }
 
       // After the deposit, the registry contract should own the deposited
@@ -192,7 +192,7 @@ export const RequestForWallet = (ind: number[]) => {
       // After the deposit, the Wallet address should have the full deposited
       // balance accounted for.
       {
-        const res = await Registry.searchBalance(wal.address);
+        const res = await Registry.SearchBalance(wal.address);
         expect(res[0]).to.equal(0); // allocated
         expect(res[1]).to.equal(Amount(10)); // deposited
         expect(res[2]).to.equal(0); // historic
@@ -206,13 +206,13 @@ export const RequestForWallet = (ind: number[]) => {
       });
 
       {
-        await Registry.connect(pla).request(grd, tim, wal, sg2);
+        await Registry.connect(pla).Request(grd, tim, wal, sg2);
       }
 
       // After the request, the Wallet address should have allocated some buy-in
       // amount, which got deducted from the deposited balance.
       {
-        const res = await Registry.searchBalance(wal.address);
+        const res = await Registry.SearchBalance(wal.address);
         expect(res[0]).to.equal(Amount(1)); // allocated
         expect(res[1]).to.equal(Amount(9)); // deposited
         expect(res[2]).to.equal(0); // historic
@@ -229,13 +229,13 @@ export const Resolve = async () => {
   const { Address, Balance, Registry, Signer, Stablecoin } = await loadFixture(RequestForWallet([2, 5, 8]));
 
   {
-    const txn = Registry.connect(Signer(1)).resolve(
+    const txn = Registry.connect(Signer(1)).Resolve(
       Kill(1001),
       Address(5), // win
       Address(8) // los
     );
 
-    await expect(txn).to.emit(Registry, "Resolve").withArgs(
+    await expect(txn).to.emit(Registry, "GuardianResolve").withArgs(
       Address(1),
       Kill(1001),
       Address(5),
@@ -247,7 +247,7 @@ export const Resolve = async () => {
 
   // Signer 0 is the protocol owner that earned some fees.
   {
-    const res = await Registry.searchBalance(Address(0));
+    const res = await Registry.SearchBalance(Address(0));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(Amount(0.1)); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -255,7 +255,7 @@ export const Resolve = async () => {
 
   // Signer 1 is the guarduian and earned some fees.
   {
-    const res = await Registry.searchBalance(Address(1));
+    const res = await Registry.SearchBalance(Address(1));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(Amount(0.1)); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -263,7 +263,7 @@ export const Resolve = async () => {
 
   // Signer 2 is playing the game.
   {
-    const res = await Registry.searchBalance(Address(2));
+    const res = await Registry.SearchBalance(Address(2));
     expect(res[0]).to.equal(Amount(1)); // allocated
     expect(res[1]).to.equal(Amount(9)); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -271,7 +271,7 @@ export const Resolve = async () => {
 
   // Signer 3 is not playing the game.
   {
-    const res = await Registry.searchBalance(Address(3));
+    const res = await Registry.SearchBalance(Address(3));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -279,7 +279,7 @@ export const Resolve = async () => {
 
   // Signer 4 is not playing the game.
   {
-    const res = await Registry.searchBalance(Address(4));
+    const res = await Registry.SearchBalance(Address(4));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -287,7 +287,7 @@ export const Resolve = async () => {
 
   // Signer 5 won against signer 8.
   {
-    const res = await Registry.searchBalance(Address(5));
+    const res = await Registry.SearchBalance(Address(5));
     expect(res[0]).to.equal(Amount(1.4)); // allocated
     expect(res[1]).to.equal(Amount(9.4)); // deposited
     expect(res[2]).to.equal(Amount(0.4)); // historic
@@ -295,7 +295,7 @@ export const Resolve = async () => {
 
   // Signer 6 is not playing the game.
   {
-    const res = await Registry.searchBalance(Address(6));
+    const res = await Registry.SearchBalance(Address(6));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -303,7 +303,7 @@ export const Resolve = async () => {
 
   // Signer 7 is not playing the game.
   {
-    const res = await Registry.searchBalance(Address(7));
+    const res = await Registry.SearchBalance(Address(7));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -311,7 +311,7 @@ export const Resolve = async () => {
 
   // Signer 8 lost against signer 5.
   {
-    const res = await Registry.searchBalance(Address(8));
+    const res = await Registry.SearchBalance(Address(8));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(Amount(9)); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -319,7 +319,7 @@ export const Resolve = async () => {
 
   // Signer 9 is not playing the game.
   {
-    const res = await Registry.searchBalance(Address(9));
+    const res = await Registry.SearchBalance(Address(9));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
@@ -327,7 +327,7 @@ export const Resolve = async () => {
 
   // Signer 10 is not playing the game.
   {
-    const res = await Registry.searchBalance(Address(10));
+    const res = await Registry.SearchBalance(Address(10));
     expect(res[0]).to.equal(0); // allocated
     expect(res[1]).to.equal(0); // deposited
     expect(res[2]).to.equal(0); // historic
