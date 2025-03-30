@@ -36,14 +36,14 @@ contract Registry {
     //
     //     pla is the address of the player reporting this kill state
     //     grd is the address of the guardian resolving this kill state
-    //     kil is the ID of the kill state itself being reported
+    //     kil is the UUID of the kill state itself being reported
     //     win is the address of the winning player being reported
     //     los is the address of the losing player being reported
     //
     event WitnessPublish(
         address indexed pla,
         address indexed grd,
-        uint256 kil,
+        bytes16 kil,
         address win,
         address los
     );
@@ -52,15 +52,16 @@ contract Registry {
     // updated.
     //
     //     grd is the address of the guardian resolving this kill state
-    //     kil is the ID of the kill state itself being resolved
+    //     kil is the UUID of the kill state itself being resolved
     //     win is the address of the winning player being resolved
     //     los is the address of the losing player being resolved
     //     dep is the amount of tokens won by the winning player
     //     buy is the amount of tokens lost by the losing player
     //
+    // TODO should we also add GuardianRelease and GuardianEscape?
     event GuardianResolve(
         address indexed grd,
-        uint256 kil,
+        bytes16 kil,
         address win,
         address los,
         uint256 dep,
@@ -81,15 +82,16 @@ contract Registry {
     // players. The deposited balance is the part of the player balance that can
     // be withdrawn any time.
     mapping(address => uint256) private _depositedBalance;
-    // _historicGain tracks the historical net balances gained by winning games.
-    // This counter increases if players win and decreases if players lose. The
-    // "best" player will have the highest historic gain, because that player
-    // lost less and won more than any other player on a net basis. This
-    // historic gain may help us to differentiate between different leagues of
-    // players. Inexperienced players may not play with elite players so that we
-    // can replicate settings comparable to poker tables with varying blind
-    // sizes.
-    mapping(address => uint256) private _historicGain;
+    // _historicalProfit tracks the historical net profit gained by winning
+    // games. This counter increases if players win and decreases if players
+    // lose. The "best" player will have the highest historical profit, because
+    // that player lost less and won more than any other player on a net basis.
+    // This historical profit may help us to differentiate between different
+    // leagues of players. Inexperienced players may not play with elite players
+    // so that we can replicate settings comparable to poker tables with varying
+    // blind sizes. Also, a balance history might help to identify players for
+    // certain community reward programs and leaderboards.
+    mapping(address => uint256) private _historicalProfit;
     // _playerWallet
     mapping(address => address) private _playerWallet;
     // _signerWallet
@@ -132,12 +134,12 @@ contract Registry {
     // BASIS_TOTAL is the total amount of basis points in 100%. This amount is
     // used to calculate fees and their remainders.
     uint16 public constant BASIS_TOTAL = 10_000;
-    // KILL_STATE_ESCAPE is the kill state to identify players who had to escape
-    // from faulty Guardians.
-    uint256 public constant KILL_STATE_ESCAPE = 47;
-    // KILL_STATE_RELEASE is the kill state to identify an orderly release of an
-    // active player as executed by the associated Guardian.
-    uint256 public constant KILL_STATE_RELEASE = 33;
+    // KILL_STATE_ESCAPE is the UUID for the kill state that identifies active
+    // players who had to escape from faulty Guardians.
+    bytes16 public constant KILL_STATE_ESCAPE = bytes16(uint128(47));
+    // KILL_STATE_RELEASE is the UUID for the kill state that identifies active
+    // players who were orderly released by their delegated Guardian.
+    bytes16 public constant KILL_STATE_RELEASE = bytes16(uint128(33));
     // VERSION is the code release of https://github.com/anubis-game/contracts.
     string public constant VERSION = "v0.4.0";
 
@@ -403,6 +405,10 @@ contract Registry {
         }
     }
 
+    // TODO think about shared earnings for teams of players
+    // TODO can we use docs.splits.org for team distributions or just a safe multisig?
+    // TODO how would we differentiate between players playing for themselves or playing for a team?
+
     // Publish allows any witnessing Player to report the kill state for any
     // player pair exactly once, as long as those witnesses participate in the
     // associated games themselves.
@@ -411,7 +417,7 @@ contract Registry {
     //     inp[1] the address of the winning player being reported
     //     inp[2] the address of the losing player being reported
     //
-    function Publish(uint256 kil, address win, address los) public {
+    function Publish(bytes16 kil, address win, address los) public {
         // pla
         address pla = msg.sender;
         // wal
@@ -461,7 +467,7 @@ contract Registry {
         }
     }
 
-    function Resolve(uint256 kil, address win, address los) public {
+    function Resolve(bytes16 kil, address win, address los) public {
         // grd
         address grd = msg.sender;
 
@@ -552,7 +558,7 @@ contract Registry {
     //
     //     out[0] the allocated user balance
     //     out[1] the deposited user balance
-    //     out[2] the historic net gain
+    //     out[2] the historical user profit
     //
     function SearchBalance(
         address wal
@@ -560,7 +566,7 @@ contract Registry {
         return (
             _allocatedBalance[wal],
             _depositedBalance[wal],
-            _historicGain[wal]
+            _historicalProfit[wal]
         );
     }
 
@@ -722,7 +728,7 @@ contract Registry {
     }
 
     // TODO document
-    function release(address grd, uint256 kil, address wal) private {
+    function release(address grd, bytes16 kil, address wal) private {
         //
         uint256 alo = _allocatedBalance[wal];
 
@@ -763,7 +769,7 @@ contract Registry {
     // TODO document
     function resolve(
         address grd,
-        uint256 kil,
+        bytes16 kil,
         address win,
         address los
     ) private {
@@ -806,17 +812,17 @@ contract Registry {
             // Add the increase in deposited balance to the historical net gain
             // of the winner player. The amount of tokens added here is the
             // cumulative value that winning players earn over time.
-            _historicGain[win] += depBal;
+            _historicalProfit[win] += depBal;
         }
 
         unchecked {
             // Remove the buyin amount from the historical net gain of the
             // losing player. This reduces the historical performance of losing
             // players up to zero.
-            if (_historicGain[los] < buyin) {
-                delete _historicGain[los];
+            if (_historicalProfit[los] < buyin) {
+                delete _historicalProfit[los];
             } else {
-                _historicGain[los] -= buyin;
+                _historicalProfit[los] -= buyin;
             }
             // Take all allocated balance away from the losing player. That
             // enables the losing player to enter the same game again, if they
